@@ -10,6 +10,7 @@ packages:
       - dms-shell-niri
       - nautilus
       - loupe
+      - nvim
       - git
       - github-cli
     aur:
