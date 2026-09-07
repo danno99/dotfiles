@@ -17,6 +17,6 @@ fi
 
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
-fish_config prompt choose default
+fish -c "fish_config prompt choose default; fish_config prompt save"
 
 echo "Software installation sync complete!"
