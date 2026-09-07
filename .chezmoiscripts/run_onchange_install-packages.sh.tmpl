@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# packages.yaml hash: {{ include ".chezmoidata/packages.yaml" | sha256sum }}
+set -euo pipefail
+
+echo "Checking for new packages to install on CachyOS..."
+
+# 1. Update system databases and install official repo packages
+sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
+
+# 2. Install AUR packages using paru (pre-installed by default on CachyOS)
+if command -v paru &> /dev/null; then
+    paru -S --needed --noconfirm {{ range .packages.cachyos.aur }}{{ . }} {{ end }}
+else
+    echo "paru not found, skipping AUR packages."
+fi
+
+echo "Software installation sync complete!"
