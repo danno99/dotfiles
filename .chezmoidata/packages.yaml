@@ -1,0 +1,11 @@
+# ~/.local/share/chezmoi/.chezmoidata/packages.yaml
+packages:
+  cachyos:
+    pacman:
+      - paru
+      - neovim
+      - ripgrep
+      - fastfetch
+      - git
+    aur:
+      - visual-studio-code-bin
