@@ -1,0 +1,5 @@
+// ────────────── Startup Applications ──────────────
+// https://github.com/YaLTeR/niri/wiki/Configuration:-Miscellaneous#spawn-sh-at-startup
+
+    spawn-at-startup "dms" "run"
+    spawn-at-startup "xwayland-satellite"

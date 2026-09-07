@@ -1,0 +1,19 @@
+    layout {
+        gaps 3 // Gap between windows
+	
+        focus-ring {
+            width 2
+	    active-color "#d79921"
+            inactive-color "#504945"  // Gruvbox Dark Gray 4
+        }
+
+        center-focused-column "never" // Don’t auto-center focused column
+
+        preset-column-widths {
+            proportion 0.33333
+            proportion 0.5
+            proportion 0.66667
+        }
+
+        struts {}
+    }
