@@ -8,7 +8,6 @@ packages:
       - helium-browser-bin
       - ttf-jetbrains-mono-nerd
       - dms-shell-niri
-      - fastfetch
       - nautilus
       - loupe
       - git
