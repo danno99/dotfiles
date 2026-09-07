@@ -13,6 +13,8 @@ packages:
       - nvim
       - git
       - github-cli
+      - podman
+      - podman-compose
     aur:
       - visual-studio-code-bin
       - z13ctl-plus-bin
