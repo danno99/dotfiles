@@ -3,9 +3,16 @@ packages:
   cachyos:
     pacman:
       - paru
-      - neovim
-      - ripgrep
+      - foot
+      - xwayland-satellite
+      - helium-browser-bin
+      - ttf-jetbrains-mono-nerd
+      - dms-shell-niri
       - fastfetch
+      - nautilus
+      - loupe
       - git
+      - github-cli
     aur:
       - visual-studio-code-bin
+      - z13ctl-plus-bin
