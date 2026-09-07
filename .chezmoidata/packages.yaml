@@ -15,6 +15,7 @@ packages:
       - github-cli
       - podman
       - podman-compose
+      - podman-docker
     aur:
       - visual-studio-code-bin
       - z13ctl-plus-bin
