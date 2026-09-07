@@ -18,5 +18,6 @@ fi
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
 fish -c "fish_config prompt choose default && funcsave fish_prompt"
+fish -c "set -Ux EDITOR nvim"
 
 echo "Software installation sync complete!"
