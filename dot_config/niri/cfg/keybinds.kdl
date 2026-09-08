@@ -10,7 +10,8 @@ binds {
     MOD+A                               hotkey-overlay-title="Open App Launcher" { spawn "dms" "ipc" "call" "spotlight" "toggle"; }
     MOD+B                               hotkey-overlay-title="Open Browser" { spawn "helium-browser"; }
     MOD+C                               hotkey-overlay-title="Open Code" { spawn "code"; }
-    MOD+E                               hotkey-overlay-title="File Manager" { spawn "nautilus"; }
+    MOD+E                               hotkey-overlay-title="Open File Manager" { spawn "nautilus"; }
+    MOD+P                               hotkey-overlay-title="Open Screenshot" { spawn "dms" "screenshot"; }
     MOD+ALT+L                           hotkey-overlay-title="Lock Screen" { spawn "dms" "ipc" "call" "lock" "lockAndOutputsOff"; }
 
     // ─── Audio Controls ───
