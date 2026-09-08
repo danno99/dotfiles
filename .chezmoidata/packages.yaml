@@ -18,6 +18,10 @@ packages:
       - podman-compose
       - podman-docker
       - easyeffects
+      - lsp-plugins-lv2 
+      - calf 
+      - zam-plugins-lv2 
+      - mda.lv2
     aur:
       - visual-studio-code-bin
       - ryzen_smu-dkms-git
