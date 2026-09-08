@@ -4,6 +4,7 @@ packages:
     pacman:
       - paru
       - foot
+      - ly
       - xwayland-satellite
       - helium-browser-bin
       - ttf-jetbrains-mono-nerd
@@ -16,7 +17,6 @@ packages:
       - podman
       - podman-compose
       - podman-docker
-      - ollama-rocm
       - easyeffects
     aur:
       - visual-studio-code-bin

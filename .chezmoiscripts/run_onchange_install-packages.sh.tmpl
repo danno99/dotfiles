@@ -21,14 +21,13 @@ gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 # Configure fish shell with default prompt and set nvim as the default editor
 fish -c "fish_config prompt choose default && funcsave fish_prompt"
 fish -c "set -Ux EDITOR nvim"
-
-sudo systemctl enable --now ollama.service
+fish -c "alias --save vi='nvim'"
+fish -c "alias --save vim='nvim'"
 
 sudo modprobe ryzen_smu
 grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf || echo "ryzen_smu" | sudo tee -a /etc/modules-load.d/ryzen_smu.conf
 
 z13ctl batterylimit --set 60
-z13ctl undervolt --set -40
 
 echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 
