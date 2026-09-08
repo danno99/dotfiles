@@ -7,12 +7,11 @@ binds {
 
     // ─── Applications ───
     MOD+RETURN                          hotkey-overlay-title="Open Terminal" { spawn "foot"; }
-    MOD+D                               hotkey-overlay-title="Open App Launcher" { spawn "dms" "ipc" "call" "spotlight" "toggle"; }
+    MOD+A                               hotkey-overlay-title="Open App Launcher" { spawn "dms" "ipc" "call" "spotlight" "toggle"; }
     MOD+B                               hotkey-overlay-title="Open Browser" { spawn "helium-browser"; }
-    MOD+ALT+L                           hotkey-overlay-title="Lock Screen: noctalia lock" { spawn "dms" "ipc" "call" "lock" "lockAndOutputsOff"; }
-
-    // Please choose your own file manager.
+    MOD+C                               hotkey-overlay-title="Open Code" { spawn "code"; }
     MOD+E                               hotkey-overlay-title="File Manager" { spawn "nautilus"; }
+    MOD+ALT+L                           hotkey-overlay-title="Lock Screen" { spawn "dms" "ipc" "call" "lock" "lockAndOutputsOff"; }
 
     // ─── Audio Controls ───
     XF86AUDIORAISEVOLUME                allow-when-locked=true { spawn "dms" "ipc" "audio" "increment" "5"; }
@@ -100,7 +99,7 @@ binds {
 
     // ─── Layout Controls ───
     MOD+CTRL+F                          { expand-column-to-available-width; }
-    MOD+C                               { center-column; }
+    // MOD+C                               { center-column; }
     MOD+CTRL+C                          { center-visible-columns; }
     MOD+MINUS                           { set-column-width "-10%"; }
     MOD+EQUAL                           { set-column-width "+10%"; }

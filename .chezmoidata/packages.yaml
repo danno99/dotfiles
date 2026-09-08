@@ -21,4 +21,4 @@ packages:
     aur:
       - visual-studio-code-bin
       - ryzen_smu-dkms-git
-      - z13ctl-plus-bin
+      - z13ctl-bin
