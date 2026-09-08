@@ -15,9 +15,19 @@ else
     echo "paru not found, skipping AUR packages."
 fi
 
+# Set GNOME to use dark color scheme
 gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
+# Configure fish shell with default prompt and set nvim as the default editor
 fish -c "fish_config prompt choose default && funcsave fish_prompt"
 fish -c "set -Ux EDITOR nvim"
+
+sudo systemctl enable --now ollama
+
+sudo modprobe ryzen_smu
+grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf || echo "ryzen_smu" | sudo tee -a /etc/modules-load.d/ryzen_smu.conf
+
+echo 1 | bash -c "$(curl -fsSL https://raw.githubusercon
+tent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 
 echo "Software installation sync complete!"

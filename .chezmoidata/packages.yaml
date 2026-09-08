@@ -16,6 +16,9 @@ packages:
       - podman
       - podman-compose
       - podman-docker
+      - ollama-rocm
+      - easyeffects
     aur:
       - visual-studio-code-bin
+      - ryzen_smu-dkms-git
       - z13ctl-plus-bin
