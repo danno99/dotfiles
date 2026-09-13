@@ -33,6 +33,8 @@ z13ctl batterylimit --set 60
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
 sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
 
+nmcli connection modify "syn52" ipv4.ignore-auto-dns yes
+
 test -d ~/.config/easyeffects || echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 
 echo "Software installation sync complete"
