@@ -29,6 +29,7 @@ sudo modprobe ryzen_smu
 grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf || echo "ryzen_smu" | sudo tee -a /etc/modules-load.d/ryzen_smu.conf
 
 z13ctl batterylimit --set 60
+z13ctl apply --color gold --brightness low
 
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
 sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
@@ -36,5 +37,15 @@ sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
 nmcli connection modify "syn52" ipv4.ignore-auto-dns yes
 
 test -d ~/.config/easyeffects || echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
+
+sudo pacman -Syu --needed qemu-desktop virt-manager swtpm dnsmasq vde2 openbsd-netcat libvirt
+echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
+sudo usermod -aG libvirt $USER
+sudo mkdir -p /var/lib/libvirt/images
+sudo chattr +C /var/lib/libvirt/images
+sudo systemctl enable --now libvirtd.service
+sudo systemctl enable --now libvirtd.socket
+sudo virsh net-autostart default
+sudo virsh net-start default
 
 echo "Software installation sync complete"

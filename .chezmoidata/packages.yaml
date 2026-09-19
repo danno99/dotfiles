@@ -22,6 +22,15 @@ packages:
       - calf 
       - zam-plugins-lv2 
       - mda.lv2
+      - mpv
+      - celluloid
+      - qemu-desktop
+      - virt-manager
+      - swtpm
+      - dnsmasq
+      - vde2
+      - openbsd-netcat
+      - libvirt
     aur:
       - visual-studio-code-bin
       - ryzen_smu-dkms-git
