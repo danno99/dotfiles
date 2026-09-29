@@ -1,0 +1,9 @@
+[Unit]
+Description=User Socket for llama.cpp API proxy
+
+[Socket]
+ListenStream=127.0.0.1:8080
+KeepAlive=true
+
+[Install]
+WantedBy=default.target

@@ -31,6 +31,9 @@ packages:
       - vde2
       - openbsd-netcat
       - libvirt
+      - llama-cpp
+      - ggml-vulkan
+      - vulkan-radeon
     aur:
       - visual-studio-code-bin
       - ryzen_smu-dkms-git

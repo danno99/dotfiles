@@ -1,0 +1,12 @@
+[Unit]
+Description=Local llama.cpp server
+StopWhenUnneeded=true
+
+[Service]
+Type=exec
+ExecStart=llama-server --model %h/.local/share/models/Qwen3.8-27B-UD-Q4_K_XL.gguf --alias qwen38-local --host 127.0.0.1 --port 8081 --device Vulkan0 -ngl 99 --ctx-size 131072 --parallel 1 --flash-attn on --jinja --reasoning-effort low --spec-type draft-mtp --spec-draft-n-max 4
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
