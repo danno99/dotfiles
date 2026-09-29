@@ -8,7 +8,7 @@ echo "Checking for new packages to install on CachyOS..."
 # 1. Update system databases and install official repo packages
 sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
 
-# 2. Install AUR packages using paru (pre-installed by default on CachyOS)
+# 2. Install AUR packages using paru 
 if command -v paru &> /dev/null; then
     paru -S --needed --noconfirm {{ range .packages.cachyos.aur }}{{ . }} {{ end }}
 else
@@ -31,21 +31,65 @@ grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf || echo "ryzen_smu" | s
 z13ctl batterylimit --set 60
 z13ctl apply --color gold --brightness low
 
+systemctl --user daemon-reload
+systemctl --user enable --now llama-api.socket
+
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
 sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
 
-nmcli connection modify "syn52" ipv4.ignore-auto-dns yes
+nmcli device modify "wlan0" ipv4.ignore-auto-dns yes
 
 test -d ~/.config/easyeffects || echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 
-sudo pacman -Syu --needed qemu-desktop virt-manager swtpm dnsmasq vde2 openbsd-netcat libvirt
-echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
-sudo usermod -aG libvirt $USER
-sudo mkdir -p /var/lib/libvirt/images
-sudo chattr +C /var/lib/libvirt/images
-sudo systemctl enable --now libvirtd.service
-sudo systemctl enable --now libvirtd.socket
-sudo virsh net-autostart default
-sudo virsh net-start default
+# 1. Append configuration only if it doesn't already exist
+if [ -f /etc/libvirt/network.conf ] && grep -Fq 'firewall_backend = "iptables"' /etc/libvirt/network.conf; then
+    echo "  -> Firewall backend already set to iptables. Skipping."
+else
+    echo "  -> Configuring firewall backend..."
+    echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
+fi
+
+# 2. Safely handle the directory creation and chattr attributes
+if [ ! -d /var/lib/libvirt/images ]; then
+    echo "  -> Creating libvirt images directory..."
+    sudo mkdir -p /var/lib/libvirt/images
+fi
+
+# Check if the NOCOW (+C) attribute is already applied (common on Btrfs systems)
+if lsattr -d /var/lib/libvirt/images 2>/dev/null | grep -q -- '[-i][-a]C'; then
+    echo "  -> NOCOW (+C) attribute already set on images directory. Skipping."
+else
+    echo "  -> Setting NOCOW (+C) attribute..."
+    sudo chattr +C /var/lib/libvirt/images
+fi
+
+# 3. Enable and start services only if they aren't active/enabled
+for service in libvirtd.service libvirtd.socket; do
+    if systemctl is-enabled --quiet "$service" && systemctl is-active --quiet "$service"; then
+        echo "  -> Service $service is already running and enabled. Skipping."
+    else
+        echo "  -> Starting and enabling $service..."
+        sudo systemctl enable --now "$service"
+    fi
+done
+
+# 4. Safely configure and start the default network
+# Check if default network is active
+if sudo virsh net-info default 2>/dev/null | grep -qE "Active:\s+yes"; then
+    echo "  -> libvirt default network is already active. Skipping."
+else
+    echo "  -> Starting default network..."
+    sudo virsh net-start default
+fi
+
+# Check if default network is set to autostart
+if sudo virsh net-info default 2>/dev/null | grep -qE "Autostart:\s+yes"; then
+    echo "  -> libvirt default network autostart already enabled. Skipping."
+else
+    echo "  -> Setting default network to autostart..."
+    sudo virsh net-autostart default
+fi
+
+sudo usermod -aG libvirt,render,audio,video $USER
 
 echo "Software installation sync complete"
