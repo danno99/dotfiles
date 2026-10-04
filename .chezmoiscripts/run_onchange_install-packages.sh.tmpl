@@ -5,43 +5,115 @@ set -euo pipefail
 
 echo "Checking for new packages to install on CachyOS..."
 
-# 1. Update system databases and install official repo packages
-sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/chezmoi"
+mkdir -p "$STATE_DIR"
 
-# 2. Install AUR packages using paru 
-if command -v paru &> /dev/null; then
-    paru -S --needed --noconfirm {{ range .packages.cachyos.aur }}{{ . }} {{ end }}
-else
-    echo "paru not found, skipping AUR packages."
+# ---------------------------------------------------------------------------
+# 1. Chaotic-AUR binary repo (idempotent: runs only once, if not registered)
+#    Precompiled builds of popular AUR packages (incl. paru itself), so they
+#    install via plain pacman instead of being built from source.
+#    Official setup flow: https://aur.chaotic.cx/docs
+# ---------------------------------------------------------------------------
+if ! grep -qxF '^\[chaotic-aur\]' /etc/pacman.conf; then
+    echo "  -> Registering Chaotic-AUR repo..."
+    # Import + trust the Chaotic-AUR signing key (keyserver, then vendor copy)
+    if ! sudo pacman-key --finger 3056513887B78AEB &>/dev/null; then
+        sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com \
+          || { curl -fsSL https://raw.githubusercontent.com/chaotic-aur/chaotic-aur.github.io/master/chaotic.gpg -o /tmp/chaotic.gpg
+               sudo pacman-key --import /tmp/chaotic.gpg
+               rm -f /tmp/chaotic.gpg; }
+        sudo pacman-key --lsign-key 3056513887B78AEB
+    fi
+    # Their keyring + mirrorlist packages (provides /etc/pacman.d/chaotic-mirrorlist)
+    sudo pacman -U --noconfirm \
+        'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
+        'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+    # Append at the end so official repos keep priority
+    printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' | sudo tee -a /etc/pacman.conf
 fi
 
-# Set GNOME to use dark color scheme
-gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+# ---------------------------------------------------------------------------
+# 2. Official repo packages (DB refresh only — no implicit full upgrade).
+#    System upgrades stay a deliberate manual step: run `paru -Syu` yourself
+#    (covers official + AUR + Chaotic-AUR packages).
+# ---------------------------------------------------------------------------
+sudo pacman -Sy --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
 
-# Configure fish shell with default prompt and set nvim as the default editor
-fish -c "fish_config prompt choose default && funcsave fish_prompt"
-fish -c "set -Ux EDITOR nvim"
-fish -c "set -Ux SUDO_EDITOR nvim"
-fish -c "alias --save vi='nvim'"
-fish -c "alias --save vim='nvim'"
+# ---------------------------------------------------------------------------
+# 3. AUR packages, split automatically:
+#    - resolvable from a configured repo (incl. chaotic-aur) -> pacman (precompiled)
+#    - everything else -> built from AUR with paru
+# ---------------------------------------------------------------------------
+chaotic_pkgs=()
+aur_only=()
+for p in {{ range .packages.cachyos.aur }}{{ . }} {{ end }}; do
+    if pacman -Si "$p" &>/dev/null; then
+        chaotic_pkgs+=("$p")
+    else
+        aur_only+=("$p")
+    fi
+done
 
-sudo modprobe ryzen_smu
-grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf || echo "ryzen_smu" | sudo tee -a /etc/modules-load.d/ryzen_smu.conf
+if [ ${#chaotic_pkgs[@]} -gt 0 ]; then
+    echo "  -> Precompiled via Chaotic-AUR: ${chaotic_pkgs[*]}"
+    sudo pacman -S --needed --noconfirm "${chaotic_pkgs[@]}"
+fi
 
-z13ctl batterylimit --set 60
-z13ctl apply --color gold --brightness low
+if [ ${#aur_only[@]} -gt 0 ]; then
+    if command -v paru &>/dev/null; then
+        echo "  -> Building from AUR: ${aur_only[*]}"
+        paru -S --needed --noconfirm "${aur_only[@]}"
+    else
+        echo "  -> WARNING: paru not found, skipping AUR packages: ${aur_only[*]}" >&2
+    fi
+fi
+
+# 4. GNOME dark color scheme (only if gsettings exists on this system)
+if command -v gsettings &>/dev/null; then
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+fi
+
+# 5. Fish shell one-time setup (guarded: never overwrite later customizations)
+if [ ! -f "$STATE_DIR/fish-configured" ]; then
+    fish -c "fish_config prompt choose default && funcsave fish_prompt"
+    fish -c "set -Ux EDITOR nvim"
+    fish -c "set -Ux SUDO_EDITOR nvim"
+    fish -c "alias --save vi='nvim'"
+    fish -c "alias --save vim='nvim'"
+    touch "$STATE_DIR/fish-configured"
+fi
+
+# 6. Ryzen SMU + ThinkPad Z13 one-time setup (guarded)
+if [ ! -f "$STATE_DIR/z13ctl-applied" ]; then
+    sudo modprobe ryzen_smu
+    grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf 2>/dev/null \
+        || echo "ryzen_smu" | sudo tee -a /etc/modules-load.d/ryzen_smu.conf
+    z13ctl batterylimit --set 60
+    z13ctl apply --color gold --brightness low
+    touch "$STATE_DIR/z13ctl-applied"
+fi
 
 systemctl --user daemon-reload
 systemctl --user enable --now llama-api.socket
 
+# 7. ly config tweaks (idempotent seds)
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
 sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
 
-nmcli device modify "wlan0" ipv4.ignore-auto-dns yes
+# 8. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface name)
+wlan_dev="$(nmcli -t -f DEVICE device wifi 2>/dev/null | head -n1 || true)"
+if [ -n "$wlan_dev" ]; then
+    nmcli device modify "$wlan_dev" ipv4.ignore-auto-dns yes
+else
+    echo "  -> No Wi-Fi device found, skipping auto-DNS setting."
+fi
 
-test -d ~/.config/easyeffects || echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
+# 9. EasyEffects presets (vendored, pinned installer — no curl|bash at runtime)
+if [ ! -d ~/.config/easyeffects ]; then
+    echo 1 | bash "{{ .chezmoi.sourceDir }}/.chezmoitemplates/easyeffects-install.sh"
+fi
 
-# 1. Append configuration only if it doesn't already exist
+# 10. Append configuration only if it doesn't already exist
 if [ -f /etc/libvirt/network.conf ] && grep -Fq 'firewall_backend = "iptables"' /etc/libvirt/network.conf; then
     echo "  -> Firewall backend already set to iptables. Skipping."
 else
@@ -49,7 +121,7 @@ else
     echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
 fi
 
-# 2. Safely handle the directory creation and chattr attributes
+# 11. Safely handle the directory creation and chattr attributes
 if [ ! -d /var/lib/libvirt/images ]; then
     echo "  -> Creating libvirt images directory..."
     sudo mkdir -p /var/lib/libvirt/images
@@ -63,7 +135,7 @@ else
     sudo chattr +C /var/lib/libvirt/images
 fi
 
-# 3. Enable and start services only if they aren't active/enabled
+# 12. Enable and start services only if they aren't active/enabled
 for service in libvirtd.service libvirtd.socket; do
     if systemctl is-enabled --quiet "$service" && systemctl is-active --quiet "$service"; then
         echo "  -> Service $service is already running and enabled. Skipping."
@@ -73,7 +145,7 @@ for service in libvirtd.service libvirtd.socket; do
     fi
 done
 
-# 4. Safely configure and start the default network
+# 13. Safely configure and start the default network
 # Check if default network is active
 if sudo virsh net-info default 2>/dev/null | grep -qE "Active:\s+yes"; then
     echo "  -> libvirt default network is already active. Skipping."

@@ -1,4 +1,10 @@
 # ~/.local/share/chezmoi/.chezmoidata/packages.yaml
+#
+# pacman: installed via `pacman` from the official repos PLUS Chaotic-AUR
+#   (the install script registers the Chaotic-AUR binary repo automatically,
+#   so AUR packages that exist there — e.g. paru — install precompiled).
+# aur: installed from the AUR via paru ONLY IF not already available in a
+#   configured repo — the install script auto-splits with `pacman -Si`.
 packages:
   cachyos:
     pacman:
@@ -18,9 +24,9 @@ packages:
       - podman-compose
       - podman-docker
       - easyeffects
-      - lsp-plugins-lv2 
-      - calf 
-      - zam-plugins-lv2 
+      - lsp-plugins-lv2
+      - calf
+      - zam-plugins-lv2
       - mda.lv2
       - mpv
       - celluloid
@@ -35,6 +41,6 @@ packages:
       - ggml-vulkan
       - vulkan-radeon
     aur:
-      - visual-studio-code-bin
-      - ryzen_smu-dkms-git
-      - z13ctl-bin
+      - visual-studio-code-bin   # in Chaotic-AUR (2026-10-04) -> precompiled
+      - ryzen_smu-dkms-git       # in Chaotic-AUR (2026-10-04) -> precompiled
+      - z13ctl-bin               # NOT in Chaotic-AUR (2026-10-04) -> AUR build
