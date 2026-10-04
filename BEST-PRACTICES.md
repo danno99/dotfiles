@@ -60,9 +60,9 @@
   fit. With Chaotic-AUR the helper is only needed for the few packages chaotic
   doesn't pre-compile (currently just `z13ctl-bin`).
 - AUR membership of current manifest (checked 2026-10-04 in the chaotic mirror):
-  - `visual-studio-code-bin` → in Chaotic-AUR → precompiled
-  - `ryzen_smu-dkms-git` → in Chaotic-AUR → precompiled
-  - `z13ctl-bin` → NOT in Chaotic-AUR → AUR build via paru
+  - `visual-studio-code-bin` → in Chaotic-AUR → precompiled (now under `pacman:`)
+  - `ryzen_smu-dkms-git` → in Chaotic-AUR → precompiled (now under `pacman:`)
+  - `z13ctl-bin` → NOT in Chaotic-AUR → AUR build via paru (under `aur:`)
 
 ### 2.2 Chaotic-AUR setup (official flow, implemented in the run script)
 Official docs (https://aur.chaotic.cx/docs) flow:
@@ -77,15 +77,30 @@ Official docs (https://aur.chaotic.cx/docs) flow:
    [chaotic-aur]
    Include = /etc/pacman.d/chaotic-mirrorlist
    ```
+   ⚠️ **This append is required — `chaotic-mirrorlist` does NOT do it.**
+   Verified 2026-10-04 against the PKGBUILD (pkgbuild-chaotic-mirrorlist):
+   the package has **no install hook**; `package()` only ships
+   `/etc/pacman.d/chaotic-mirrorlist`. It never touches `/etc/pacman.conf`.
+   So the script's `tee -a` is the sole registration, and a duplicate
+   `[chaotic-aur]` block can only come from an out-of-band edit (manual
+   stanza, third-party installer, or an older pre-guard script run).
 5. Full DB refresh (`pacman -Sy` / `-Syyu`).
 
-### 2.3 pacman flags used in the script
+### 2.3 pacman flags used in the script — UPDATED 2026-10-04 (back to full `-Syu`)
 
-- `sudo pacman -Sy --needed --noconfirm <pkgs>` — DB refresh + targeted
-  install only; **no implicit full upgrade**. System upgrades are a deliberate
-  manual step: `paru -Syu` (covers official + AUR + Chaotic-AUR).
-- `--noconfirm` on targeted installs is fine; avoid it for unattended full
-  upgrades on a laptop.
+- `sudo pacman -Syu --noconfirm <pkgs>` — **full sync+upgrade** of the entire
+  pacman system (official + Chaotic-AUR) plus (re)install of the listed
+  packages. Rationale: a DB-refresh-and-only-some-packages install (`-Sy`)
+  leaves a **partial-upgrade** state that can break software (mixed package
+  versions built against different libs). A full `-Syu` keeps everything at
+  one consistent state.
+- `paru -Syu --noconfirm <aur-only pkgs>` — full AUR+official upgrade; same
+  consistency rationale for the AUR side.
+- ⚠️ **Tradeoff:** this now runs a **full system upgrade, unattended
+  (`--noconfirm`), on every manifest change** — heavier and auto-accepts every
+  upgrade hook. Accepted deliberately to guarantee consistency. To review
+  upgrades, run `chezmoi apply` when you can watch it, or pre-run `pacman -Syu`
+  / `paru -Syu` manually.
 - AUR packages are only rebuilt/updated by the helper: `paru -Syu`, not pacman:
   https://wiki.archlinux.org/title/AUR_helper
 - AUR security: vet PKGBUILDs (source URLs, functions); AUR helpers are
@@ -114,7 +129,7 @@ no inspectable system state AND cannot run as `run_once` (dependency ordering).
 | `fish_config prompt choose default` overwrote user customizations | Moved to `.chezmoiscripts/run_once_machine-setup.sh` — chezmoi-native `run_once` semantics, no state file (v2, 2026-10-04) |
 | `nmcli device modify "wlan0"` hardcoded interface | `nmcli -t -f DEVICE device wifi \| head -n1` lookup + no-device fallback |
 | `curl \| bash` for EasyEffects presets (supply-chain) | Vendored pinned copy in `.chezmoitemplates/easyeffects-install.sh`; run via `{{ .chezmoi.sourceDir }}` |
-| `sudo pacman -Syu` full upgrade on every run | `pacman -Sy` (install-only); upgrades manual via `paru -Syu` |
+| `sudo pacman -Syu` full upgrade on every run | → `pacman -Sy` install-only, **reverted 2026-10-04 back to full `pacman -Syu` / `paru -Syu`** — partial installs (`-Sy`) risk breaking software (see §2.3) |
 | `gsettings` would abort the script (`set -e`) on non-GNOME systems | `command -v gsettings` guard |
 | AUR packages always built from source | Auto-split: `pacman -Si` check → chaotic-aur (pacman) vs AUR (paru) |
 | (latent) `pacman -S paru` broken since paru left official repos | paru now resolves via Chaotic-AUR (verified present there) |
@@ -136,7 +151,7 @@ no inspectable system state AND cannot run as `run_once` (dependency ordering).
 
 1. ✅ Rename `AGENT.md` → `AGENTS.md` (done — required for Pi auto-discovery).
 2. ✅ Create this one-time research file.
-3. ✅ Switched to `-Sy` (install-only); upgrades are manual `paru -Syu`.
+3. ✅ **Back to full `-Syu` (2026-10-04):** `pacman -Syu` / `paru -Syu` on each run to avoid partial-upgrade breakage (was briefly `-Sy` install-only — reverted).
 4. ✅ Chaotic-AUR enabled automatically by the run script (official flow, §2.2).
 5. ✅ Applied all §2.5 fixes (guards, vendored EasyEffects, Wi-Fi lookup, AUR split).
 6. ✅ Paru vs shelly: **keep paru** (pre-built in Chaotic-AUR), shelly not needed.

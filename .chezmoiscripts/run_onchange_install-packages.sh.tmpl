@@ -30,9 +30,12 @@ if ! grep -qxF '^\[chaotic-aur\]' /etc/pacman.conf; then
 fi
 
 # Dedup: remove duplicate [chaotic-aur] blocks (keep first, drop rest).
-# This can happen if the repo was added both manually/by-script AND by the
-# chaotic-mirrorlist package post-install hook. Duplicate causes pacman to
-# print "database already registered" and makes paru fail.
+# chaotic-mirrorlist has NO install hook (verified 2026-10-04: PKGBUILD only
+# ships /etc/pacman.d/chaotic-mirrorlist), so the `tee -a` append above is the
+# ONLY in-script registration, and the `grep -qxF` guard stops it re-appending.
+# Duplicates therefore come from OUT-OF-BAND edits: a manual stanza, a
+# third-party installer, or an older pre-guard script run. Duplicates make
+# pacman print "database already registered" and break paru.
 _chaotic_count=$(grep -c '^\[chaotic-aur\]' /etc/pacman.conf || true)
 if [ "${_chaotic_count:-0}" -gt 1 ]; then
     echo "  -> Removing duplicate [chaotic-aur] entry from pacman.conf..."
@@ -47,16 +50,21 @@ if [ "${_chaotic_count:-0}" -gt 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Official repo packages (DB refresh only — no implicit full upgrade).
-#    System upgrades stay a deliberate manual step: run `paru -Syu` yourself
-#    (covers official + AUR + Chaotic-AUR packages).
+# 2. Official repo packages — FULL sync+upgrade (pacman -Syu).
+#    A full upgrade keeps the whole pacman system (official + Chaotic-AUR) at
+#    one consistent state, avoiding the partial-upgrade breakage that a
+#    DB-refresh-and-only-some-packages (-Sy) install can cause. The manifest
+#    packages are listed so they're (re)installed if missing. NOTE: this is a
+#    full system upgrade with --noconfirm on every manifest change — heavier
+#    and unattended by design (see BEST-PRACTICES.md §2.3).
 # ---------------------------------------------------------------------------
-sudo pacman -Sy --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
+sudo pacman -Syu --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
 
 # ---------------------------------------------------------------------------
-# 3. AUR packages, split automatically:
-#    - resolvable from a configured repo (incl. chaotic-aur) -> pacman (precompiled)
-#    - everything else -> built from AUR with paru
+# 3. AUR packages (genuinely AUR-only — not in any pacman repo). Built via
+#    paru. The `pacman -Si` pre-check is a safety net: if an entry is ever
+#    resolvable from a configured repo (e.g. newly added to Chaotic-AUR), it
+#    installs precompiled instead of being built from source.
 # ---------------------------------------------------------------------------
 chaotic_pkgs=()
 aur_only=()
@@ -75,8 +83,10 @@ fi
 
 if [ ${#aur_only[@]} -gt 0 ]; then
     if command -v paru &>/dev/null; then
-        echo "  -> Building from AUR: ${aur_only[*]}"
-        paru -S --needed --noconfirm "${aur_only[@]}"
+        # Full AUR+official upgrade (not just the listed ones) so the AUR side
+        # stays consistent too; the list ensures first-time installs.
+        echo "  -> Full AUR upgrade + ensuring: ${aur_only[*]}"
+        paru -Syu --noconfirm "${aur_only[@]}"
     else
         echo "  -> WARNING: paru not found, skipping AUR packages: ${aur_only[*]}" >&2
     fi
