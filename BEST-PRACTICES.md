@@ -102,10 +102,16 @@ Official docs (https://aur.chaotic.cx/docs) flow:
   libvirt image CoW overhead — keep.
 
 ### 2.5 Weak spots found in the original script (ALL FIXED 2026-10-04)
+
+Design note (v2): the first fix used hand-rolled marker files in
+`~/.local/state/chezmoi/` — replaced by the idiomatic alternatives: `run_once_`
+scripts (chezmoi records content-hash state itself) and direct checks of the
+system state a step depends on. Marker files only make sense when a step has
+no inspectable system state AND cannot run as `run_once` (dependency ordering).
 | Issue | Fix applied |
 |---|---|
-| `z13ctl apply ... --brightness low` reset backlight on *every* manifest change | Marker-file guard: `~/.local/state/chezmoi/z13ctl-applied` (XDG state) |
-| `fish_config prompt choose default` overwrote user customizations | Marker-file guard: `~/.local/state/chezmoi/fish-configured` |
+| `z13ctl apply ... --brightness low` reset backlight on *every* manifest change | State-check on the real persistent artifact (`/etc/modules-load.d/ryzen_smu.conf`); one-shot `z13ctl` settings run only in the first-setup branch (v2, 2026-10-04 — no state file) |
+| `fish_config prompt choose default` overwrote user customizations | Moved to `.chezmoiscripts/run_once_machine-setup.sh` — chezmoi-native `run_once` semantics, no state file (v2, 2026-10-04) |
 | `nmcli device modify "wlan0"` hardcoded interface | `nmcli -t -f DEVICE device wifi \| head -n1` lookup + no-device fallback |
 | `curl \| bash` for EasyEffects presets (supply-chain) | Vendored pinned copy in `.chezmoitemplates/easyeffects-install.sh`; run via `{{ .chezmoi.sourceDir }}` |
 | `sudo pacman -Syu` full upgrade on every run | `pacman -Sy` (install-only); upgrades manual via `paru -Syu` |

@@ -14,6 +14,8 @@ claim is in doubt — then update the file afterward.
 - `.chezmoidata/packages.yaml` — declarative package manifest (pacman + AUR)
 - `.chezmoiscripts/run_onchange_install-packages.sh.tmpl` — idempotent install
   engine; re-runs only when the manifest's SHA256 changes
+- `.chezmoiscripts/run_once_machine-setup.sh` — one-time machine setup
+  (chezmoi-tracked, no state files)
 - `AGENTS.md` — this file; project instructions auto-loaded by Pi
 
 ## Conventions (do)
@@ -23,6 +25,9 @@ claim is in doubt — then update the file afterward.
 - Trigger apply: `chezmoi diff` (preview) → `chezmoi apply` (provision).
 
 ## Pitfalls (don't)
+- ❌ Ad-hoc marker/state files (e.g. `touch ~/.local/state/.../done`) for
+  one-time setup — use `run_once_` scripts (chezmoi tracks content hashes
+  itself) or check the real system state the step depends on.
 - ❌ `include "../.chezmoidata/..."` — `include` paths are **relative to the
   source directory**, so use `include ".chezmoidata/packages.yaml"` (no `..`).
 - ❌ Re-searching the web for already-documented practices — use
