@@ -29,6 +29,23 @@ if ! grep -qxF '^\[chaotic-aur\]' /etc/pacman.conf; then
     printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' | sudo tee -a /etc/pacman.conf
 fi
 
+# Dedup: remove duplicate [chaotic-aur] blocks (keep first, drop rest).
+# This can happen if the repo was added both manually/by-script AND by the
+# chaotic-mirrorlist package post-install hook. Duplicate causes pacman to
+# print "database already registered" and makes paru fail.
+_chaotic_count=$(grep -c '^\[chaotic-aur\]' /etc/pacman.conf || true)
+if [ "${_chaotic_count:-0}" -gt 1 ]; then
+    echo "  -> Removing duplicate [chaotic-aur] entry from pacman.conf..."
+    _tmp=$(mktemp)
+    awk '
+      /^\[chaotic-aur\]/ { if (seen++) { skip=1; next } }
+      skip && /^\[/ { skip=0 }
+      skip { next }
+      { print }
+    ' /etc/pacman.conf > "$_tmp"
+    sudo mv "$_tmp" /etc/pacman.conf
+fi
+
 # ---------------------------------------------------------------------------
 # 2. Official repo packages (DB refresh only — no implicit full upgrade).
 #    System upgrades stay a deliberate manual step: run `paru -Syu` yourself

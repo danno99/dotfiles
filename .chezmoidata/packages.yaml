@@ -14,7 +14,7 @@ packages:
       - xwayland-satellite
       - helium-browser-bin
       - ttf-jetbrains-mono-nerd
-      - dms-shell-niri
+      - dms-shell
       - nautilus
       - loupe
       - nvim
