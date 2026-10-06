@@ -54,11 +54,12 @@ fi
 #    A full upgrade keeps the whole pacman system (official + Chaotic-AUR) at
 #    one consistent state, avoiding the partial-upgrade breakage that a
 #    DB-refresh-and-only-some-packages (-Sy) install can cause. The manifest
-#    packages are listed so they're (re)installed if missing. NOTE: this is a
-#    full system upgrade with --noconfirm on every manifest change — heavier
-#    and unattended by design (see BEST-PRACTICES.md §2.3).
+#    packages are listed so missing ones install; --needed skips the
+#    already-present ones (no spurious "up to date -- reinstalling"). NOTE:
+#    this is a full system upgrade with --noconfirm on every manifest change
+#    — heavier and unattended by design (see BEST-PRACTICES.md §2.3).
 # ---------------------------------------------------------------------------
-sudo pacman -Syu --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
+sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
 
 # ---------------------------------------------------------------------------
 # 3. AUR packages (genuinely AUR-only — not in any pacman repo). Built via
@@ -86,7 +87,7 @@ if [ ${#aur_only[@]} -gt 0 ]; then
         # Full AUR+official upgrade (not just the listed ones) so the AUR side
         # stays consistent too; the list ensures first-time installs.
         echo "  -> Full AUR upgrade + ensuring: ${aur_only[*]}"
-        paru -Syu --noconfirm "${aur_only[@]}"
+        paru -Syu --needed --noconfirm "${aur_only[@]}"
     else
         echo "  -> WARNING: paru not found, skipping AUR packages: ${aur_only[*]}" >&2
     fi
@@ -145,8 +146,10 @@ if [ ! -d /var/lib/libvirt/images ]; then
     sudo mkdir -p /var/lib/libvirt/images
 fi
 
-# Check if the NOCOW (+C) attribute is already applied (common on Btrfs systems)
-if lsattr -d /var/lib/libvirt/images 2>/dev/null | grep -q -- '[-i][-a]C'; then
+# Check if the NOCOW (+C) attribute is already applied (common on Btrfs systems).
+# Extract the flag field and look for C anywhere in it — lsattr flag slots are
+# position-dependent, so a fixed-offset pattern is brittle.
+if lsattr -d /var/lib/libvirt/images 2>/dev/null | awk '{print $1}' | grep -q C; then
     echo "  -> NOCOW (+C) attribute already set on images directory. Skipping."
 else
     echo "  -> Setting NOCOW (+C) attribute..."
@@ -163,17 +166,21 @@ for service in libvirtd.service libvirtd.socket; do
     fi
 done
 
-# 12. Safely configure and start the default network
-# Check if default network is active
-if sudo virsh net-info default 2>/dev/null | grep -qE "Active:\s+yes"; then
+# 12. Safely configure and start the default network (idempotent).
+#     State is read via machine-parseable queries (net-list / net-dumpxml),
+#     NOT by grepping the human-readable `net-info` output — that parse is
+#     brittle and previously failed to detect an active network, so `net-start`
+#     hit "already active" and aborted under `set -e` (2026-10-04).
+if sudo virsh net-list --state running 2>/dev/null | grep -qw default; then
     echo "  -> libvirt default network is already active. Skipping."
 else
     echo "  -> Starting default network..."
     sudo virsh net-start default
 fi
 
-# Check if default network is set to autostart
-if sudo virsh net-info default 2>/dev/null | grep -qE "Autostart:\s+yes"; then
+# Autostart: the persistent network XML carries an <autostart/> element when
+# enabled, so check that directly rather than parsing `net-info` text.
+if sudo virsh net-dumpxml default 2>/dev/null | grep -q '<autostart'; then
     echo "  -> libvirt default network autostart already enabled. Skipping."
 else
     echo "  -> Setting default network to autostart..."

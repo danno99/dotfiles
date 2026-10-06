@@ -88,14 +88,18 @@ Official docs (https://aur.chaotic.cx/docs) flow:
 
 ### 2.3 pacman flags used in the script — UPDATED 2026-10-04 (back to full `-Syu`)
 
-- `sudo pacman -Syu --noconfirm <pkgs>` — **full sync+upgrade** of the entire
-  pacman system (official + Chaotic-AUR) plus (re)install of the listed
-  packages. Rationale: a DB-refresh-and-only-some-packages install (`-Sy`)
-  leaves a **partial-upgrade** state that can break software (mixed package
-  versions built against different libs). A full `-Syu` keeps everything at
-  one consistent state.
-- `paru -Syu --noconfirm <aur-only pkgs>` — full AUR+official upgrade; same
-  consistency rationale for the AUR side.
+- `sudo pacman -Syu --needed --noconfirm <pkgs>` — **full sync+upgrade** of
+  the entire pacman system (official + Chaotic-AUR) plus install of any listed
+  package that is missing. Rationale for `-Syu` (not `-Sy`): a
+  DB-refresh-and-only-some-packages install leaves a **partial-upgrade** state
+  that can break software (mixed versions built against different libs); a
+  full `-Syu` keeps everything at one consistent state.
+- **`--needed` is required** on the explicit package list: without it,
+  already-installed packages get **reinstalled** (`warning: X is up to date
+  -- reinstalling`) — wasted downloads and, for AUR, needless source rebuilds.
+- `paru -Syu --needed --noconfirm <aur-only pkgs>` — full AUR+official upgrade
+  + install missing AUR packages; `--needed` avoids rebuilding unchanged AUR
+  packages.
 - ⚠️ **Tradeoff:** this now runs a **full system upgrade, unattended
   (`--noconfirm`), on every manifest change** — heavier and auto-accepts every
   upgrade hook. Accepted deliberately to guarantee consistency. To review
@@ -112,6 +116,11 @@ Official docs (https://aur.chaotic.cx/docs) flow:
 - Guard every mutation with a state check (`grep -qxF`, `test -d`,
   `systemctl is-enabled/--quiet`, `lsattr` for btrfs `+C` NOCOW on libvirt
   images). Keep this style for any new step.
+- Check state via **machine-parseable** queries, not by grepping human-readable
+  output. Libvirt network state: `virsh net-list --state running` (active) and
+  `virsh net-dumpxml <net> | grep '<autostart'` (autostart) — NOT
+  `virsh net-info <net> | grep "Active:\s+yes"`, which is brittle and failed once
+  (2026-10-04) by missing an active network and aborting under `set -e`.
 - `set -euo pipefail` — keep.
 - NOCOW (`chattr +C`) on `/var/lib/libvirt/images` is the standard btrfs fix for
   libvirt image CoW overhead — keep.

@@ -6,7 +6,9 @@ Requires=llama-server.service
 After=llama-server.service
 
 [Service]
-Type=notify
+# Type=simple: systemd-socket-proxyd does not speak sd_notify, so Type=notify
+# would wait for READY=1 that never arrives and fail after the start timeout.
+Type=simple
 ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=5min 127.0.0.1:8081
 StopWhenUnneeded=true
 
