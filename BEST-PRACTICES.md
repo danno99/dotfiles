@@ -117,10 +117,22 @@ Official docs (https://aur.chaotic.cx/docs) flow:
   `systemctl is-enabled/--quiet`, `lsattr` for btrfs `+C` NOCOW on libvirt
   images). Keep this style for any new step.
 - Check state via **machine-parseable** queries, not by grepping human-readable
-  output. Libvirt network state: `virsh net-list --state running` (active) and
-  `virsh net-dumpxml <net> | grep '<autostart'` (autostart) — NOT
-  `virsh net-info <net> | grep "Active:\s+yes"`, which is brittle and failed once
-  (2026-10-04) by missing an active network and aborting under `set -e`.
+  output — and **verify the query against real output on the target system
+  before trusting it** (three consecutive wrong virsh assumptions were caught
+  this way: §2.5, last row). Libvirt network state on this machine:
+  the stable column layout of plain `virsh net-list`
+  (`Name State Autostart Persistent`) — awk `$2` = active/inactive, `$3` =
+  autostart yes/no. Do NOT rely on:
+  - `net-list --state` — this virsh rejects it (*"command 'net-list' doesn't
+    support option --state"*); with stderr suppressed the output is always
+    empty and the check always fails;
+  - `net-dumpxml <net>` markers — the network XML carries **no** `<active/>`
+    or `<autostart/>` elements (verified: an *active* network's XML contains
+    neither; autostart lives in the libvirt state dir, not the XML);
+  - `net-info | grep "Active:\s+yes"` — brittle human-readable parse.
+  Each of these missed an active network at least once, so `net-start` hit
+  "already active" and aborted under `set -e`. Belt-and-braces: after a
+  failed `net-start`, re-query the state before failing (see §2.5, last row).
 - `set -euo pipefail` — keep.
 - NOCOW (`chattr +C`) on `/var/lib/libvirt/images` is the standard btrfs fix for
   libvirt image CoW overhead — keep.
@@ -142,6 +154,7 @@ no inspectable system state AND cannot run as `run_once` (dependency ordering).
 | `gsettings` would abort the script (`set -e`) on non-GNOME systems | `command -v gsettings` guard |
 | AUR packages always built from source | Auto-split: `pacman -Si` check → chaotic-aur (pacman) vs AUR (paru) |
 | (latent) `pacman -S paru` broken since paru left official repos | paru now resolves via Chaotic-AUR (verified present there) |
+| 2nd miss of an active libvirt default net: `net-list --state running` pre-check could never see the running network — virsh on this machine rejects `--state` ("command 'net-list' doesn't support option --state"), error hidden by `2>/dev/null`, so the check always failed and `net-start` → "network is already active", aborting under `set -e`. **The v3 "fix" (grep `net-dumpxml` for `<active/>`) was itself wrong** — verified by direct test: an active network's XML contains no `<active/>` (and no `<autostart/>`; autostart is stored in the libvirt state dir) (v4) | State comes from the stable `virsh net-list` columns (verified on the real machine: `default active yes yes`): awk `$2`=State, `$3`=Autostart. A failed `net-start` re-queries the same columns and only fails loudly if the network is still not active — never a spurious abort |
 
 ## 3. AGENTS.md conventions (for the Pi agent itself)
 

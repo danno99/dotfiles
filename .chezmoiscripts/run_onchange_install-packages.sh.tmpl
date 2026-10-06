@@ -167,20 +167,38 @@ for service in libvirtd.service libvirtd.socket; do
 done
 
 # 12. Safely configure and start the default network (idempotent).
-#     State is read via machine-parseable queries (net-list / net-dumpxml),
-#     NOT by grepping the human-readable `net-info` output — that parse is
-#     brittle and previously failed to detect an active network, so `net-start`
-#     hit "already active" and aborted under `set -e` (2026-10-04).
-if sudo virsh net-list --state running 2>/dev/null | grep -qw default; then
+#     State source: the stable column layout of plain `virsh net-list`
+#     (Name State Autostart Persistent), verified on this machine:
+#         Name      State    Autostart   Persistent
+#         default   active   yes         yes
+#     Do NOT rely on:
+#       - `net-list --state` — this virsh rejects it ("command 'net-list'
+#         doesn't support option --state"), so with stderr suppressed the
+#         output is always empty and the check always fails;
+#       - `net-dumpxml` markers — the network XML carries NO <active/> or
+#         <autostart/> elements (verified: active network's XML lacks both,
+#         autostart lives in the libvirt state dir, not the XML);
+#       - `net-info` — brittle human-readable parse.
+#     Belt-and-braces: after a failed `net-start`, re-query the state; only
+#     fail loudly if the network is still not active.
+_default_net_state() { sudo virsh net-list 2>/dev/null | awk '$1 == "default" { print $2 }'; }
+_default_net_autostart() { sudo virsh net-list 2>/dev/null | awk '$1 == "default" { print $3 }'; }
+
+if [ "$(_default_net_state)" = "active" ]; then
     echo "  -> libvirt default network is already active. Skipping."
 else
     echo "  -> Starting default network..."
-    sudo virsh net-start default
+    if ! sudo virsh net-start default; then
+        if [ "$(_default_net_state)" = "active" ]; then
+            echo "  -> Network became active during start attempt. Continuing."
+        else
+            echo "  -> ERROR: could not activate the default libvirt network." >&2
+            exit 1
+        fi
+    fi
 fi
 
-# Autostart: the persistent network XML carries an <autostart/> element when
-# enabled, so check that directly rather than parsing `net-info` text.
-if sudo virsh net-dumpxml default 2>/dev/null | grep -q '<autostart'; then
+if [ "$(_default_net_autostart)" = "yes" ]; then
     echo "  -> libvirt default network autostart already enabled. Skipping."
 else
     echo "  -> Setting default network to autostart..."
