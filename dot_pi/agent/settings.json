@@ -1,0 +1,13 @@
+{
+  "lastChangelogVersion": "1.4.0",
+  "theme": "system",
+  "defaultProvider": "local-llama",
+  "defaultModel": "qwen-local",
+  "defaultThinkingLevel": "medium",
+  "packages": [
+    "npm:pi-web-access",
+    "npm:pi-token-speed",
+    "npm:pi-puppeteer"
+  ],
+  "deviceId": "6188552d-b933-41f2-a005-08c0d4b36567"
+}
