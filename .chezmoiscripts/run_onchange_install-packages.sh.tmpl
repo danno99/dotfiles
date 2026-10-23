@@ -6,7 +6,15 @@ set -euo pipefail
 echo "Checking for new packages to install on CachyOS..."
 
 # ---------------------------------------------------------------------------
-# 1. Chaotic-AUR binary repo (idempotent: runs only once, if not registered)
+# 1. Default shell: switch to bash if the login shell isn't already
+# ---------------------------------------------------------------------------
+if [ "$(getent passwd "$USER" | cut -d: -f7)" != "/usr/bin/bash" ]; then
+    echo "  -> Setting default shell to bash..."
+    chsh -s /usr/bin/bash
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Chaotic-AUR binary repo (idempotent: runs only once, if not registered)
 #    Precompiled builds of popular AUR packages (incl. paru itself), so they
 #    install via plain pacman instead of being built from source.
 #    Official setup flow: https://aur.chaotic.cx/docs
@@ -50,7 +58,7 @@ if [ "${_chaotic_count:-0}" -gt 1 ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Official repo packages — FULL sync+upgrade (pacman -Syu).
+# 3. Official repo packages — FULL sync+upgrade (pacman -Syu).
 #    A full upgrade keeps the whole pacman system (official + Chaotic-AUR) at
 #    one consistent state, avoiding the partial-upgrade breakage that a
 #    DB-refresh-and-only-some-packages (-Sy) install can cause. The manifest
@@ -62,7 +70,7 @@ fi
 sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
 
 # ---------------------------------------------------------------------------
-# 3. AUR packages (genuinely AUR-only — not in any pacman repo). Built via
+# 4. AUR packages (genuinely AUR-only — not in any pacman repo). Built via
 #    paru. The `pacman -Si` pre-check is a safety net: if an entry is ever
 #    resolvable from a configured repo (e.g. newly added to Chaotic-AUR), it
 #    installs precompiled instead of being built from source.
@@ -93,12 +101,12 @@ if [ ${#aur_only[@]} -gt 0 ]; then
     fi
 fi
 
-# 4. GNOME dark color scheme (only if gsettings exists on this system)
+# 5. GNOME dark color scheme (only if gsettings exists on this system)
 if command -v gsettings &>/dev/null; then
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 fi
 
-# 5. Ryzen SMU + ThinkPad Z13 first-time setup.
+# 6. Ryzen SMU + ThinkPad Z13 first-time setup.
 #    State-checked against the real persistent artifact (modules-load.d), so
 #    the one-shot z13ctl settings only apply when the module is first set up.
 #    (z13ctl-bin is installed from AUR in step 3, which runs before this.)
@@ -115,11 +123,11 @@ fi
 systemctl --user daemon-reload
 systemctl --user enable --now llama-api.socket
 
-# 6. ly config tweaks (idempotent seds)
+# 7. ly config tweaks (idempotent seds)
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
 sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
 
-# 7. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface name)
+# 8. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface name)
 wlan_dev="$(nmcli -t -f DEVICE device wifi 2>/dev/null | head -n1 || true)"
 if [ -n "$wlan_dev" ]; then
     nmcli device modify "$wlan_dev" ipv4.ignore-auto-dns yes
@@ -127,12 +135,12 @@ else
     echo "  -> No Wi-Fi device found, skipping auto-DNS setting."
 fi
 
-# 8. EasyEffects presets (installed from the upstream repo)
+# 9. EasyEffects presets (installed from the upstream repo)
 if [ ! -d ~/.config/easyeffects ]; then
     echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 fi
 
-# 9. Append configuration only if it doesn't already exist
+# 10. Append configuration only if it doesn't already exist
 if [ -f /etc/libvirt/network.conf ] && grep -Fq 'firewall_backend = "iptables"' /etc/libvirt/network.conf; then
     echo "  -> Firewall backend already set to iptables. Skipping."
 else
@@ -140,7 +148,7 @@ else
     echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
 fi
 
-# 10. Safely handle the directory creation and chattr attributes
+# 11. Safely handle the directory creation and chattr attributes
 if [ ! -d /var/lib/libvirt/images ]; then
     echo "  -> Creating libvirt images directory..."
     sudo mkdir -p /var/lib/libvirt/images
@@ -156,7 +164,7 @@ else
     sudo chattr +C /var/lib/libvirt/images
 fi
 
-# 11. Enable and start services only if they aren't active/enabled
+# 12. Enable and start services only if they aren't active/enabled
 for service in libvirtd.service libvirtd.socket; do
     if systemctl is-enabled --quiet "$service" && systemctl is-active --quiet "$service"; then
         echo "  -> Service $service is already running and enabled. Skipping."
@@ -166,7 +174,7 @@ for service in libvirtd.service libvirtd.socket; do
     fi
 done
 
-# 12. Safely configure and start the default network (idempotent).
+# 13. Safely configure and start the default network (idempotent).
 #     State source: the stable column layout of plain `virsh net-list`
 #     (Name State Autostart Persistent), verified on this machine:
 #         Name      State    Autostart   Persistent

@@ -44,7 +44,7 @@ shopt -s histappend
 PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
 
 # --- 3. SAFETY NETS & UTILITIES -----------------------------------------------
-# Default editor (kept in sync with run_once_machine-setup.sh)
+# Default editor
 export EDITOR=nvim
 export SUDO_EDITOR=nvim
 
@@ -60,7 +60,7 @@ alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 alias ll='ls -lah --color=auto'
 
-# Editor aliases (kept in sync with run_once_machine-setup.sh)
+# Editor aliases
 alias vi='nvim'
 alias vim='nvim'
 
