@@ -44,5 +44,6 @@ packages:
       - vulkan-radeon
       - visual-studio-code-bin
       - ryzen_smu-dkms-git
+      - uv
     aur:
       - z13ctl-bin
