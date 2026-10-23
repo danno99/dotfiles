@@ -36,6 +36,9 @@ export HISTFILESIZE=500000
 # Avoid logging consecutive duplicate commands or lines starting with spaces
 export HISTCONTROL=ignoreboth
 
+# PI Local Models
+export PI_LOCAL_MODELS=1
+
 # Instantly append commands to history file upon execution and save changes
 shopt -s histappend
 PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
