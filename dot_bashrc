@@ -67,6 +67,9 @@ alias vim='nvim'
 # Run pi via mise
 alias pi='mise run pi'
 
+# Fuzzy Finder (CTRL-r)
+command -v fzf >/dev/null 2>&1 && eval "$(fzf --bash)"
+
 prompt_details() {
   local rc=$? path=$PWD branch i
   local -a parts
