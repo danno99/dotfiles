@@ -1,0 +1,57 @@
+#
+# ~/.bashrc
+#
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+# --- 1. SMART TAB-COMPLETION & CORRECTIONS ------------------------------------
+# Case-insensitive tab completion (typing 'cd doc' will find 'Documents')
+bind "set completion-ignore-case on"
+
+# Show all matching tab completions immediately on the first press
+bind "set show-all-if-ambiguous on"
+
+# Automatically fix minor typos in directory names when using 'cd'
+shopt -s cdspell
+
+# Enable advanced programmable completion patterns if installed on the OS
+if ! shopt -oq posix; then
+  if [ -f /usr/share/bash-completion/bash_completion ]; then
+    . /usr/share/bash-completion/bash_completion
+  elif [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+  fi
+fi
+
+# --- 2. UPGRADED FISH-STYLE ARROW HISTORY SEARCH ------------------------------
+# Type the beginning of a command and press Up/Down to filter history matching it
+bind '"\e[A": history-search-backward'
+bind '"\e[B": history-search-forward'
+
+# Boost history retention size
+export HISTSIZE=500000
+export HISTFILESIZE=500000
+
+# Avoid logging consecutive duplicate commands or lines starting with spaces
+export HISTCONTROL=ignoreboth
+
+# Instantly append commands to history file upon execution and save changes
+shopt -s histappend
+PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+
+# --- 3. SAFETY NETS & UTILITIES -----------------------------------------------
+# Prevent overwriting an existing file via standard output redirection ('>')
+set -o noclobber
+
+# Check window size after each command and update rows/columns if resized
+shopt -s checkwinsize
+
+# --- 4. VISUAL READABILITY & COLORIZED PROMPT ---------------------------------
+# Colorize default terminal output lists and match searches
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias ll='ls -lah --color=auto'
+
+# Clean color prompt string layout: [Time] Username@Host:CurrentDirectory $
+export PS1="\[\e[36m\][\t]\[\e[m\] \[\e[32m\]\u@\h\[\e[m\]:\[\e[33;1m\]\w\[\e[m\] \$ "
