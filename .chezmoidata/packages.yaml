@@ -6,8 +6,13 @@
 #   visual-studio-code-bin, ryzen_smu-dkms-git — so they install prebuilt.
 # aur: genuinely AUR-only (NOT in any pacman repo) — installed from the AUR
 #   via paru.
+# remove: packages to uninstall (e.g. distro defaults you don't want).
+#   The removal script uninstalls anything in this list; -n also drops the
+#   dependencies nothing else needs. Idempotent — a no-op if already absent.
 packages:
   cachyos:
+    remove:
+      - fish
     pacman:
       - paru
       - foot
@@ -25,6 +30,7 @@ packages:
       - podman
       - podman-compose
       - podman-docker
+      - fzf
       - easyeffects
       - lsp-plugins-lv2
       - calf

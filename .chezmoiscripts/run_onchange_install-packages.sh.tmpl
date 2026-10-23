@@ -101,15 +101,41 @@ if [ ${#aur_only[@]} -gt 0 ]; then
     fi
 fi
 
-# 5. GNOME dark color scheme (only if gsettings exists on this system)
+# ---------------------------------------------------------------------------
+# 5. Remove unneeded packages (the `remove` list in packages.yaml — e.g.
+#    distro defaults like fish that you don't want). Stateless + idempotent:
+#    the check is the package DB itself (only act if currently installed).
+#    -c cascades to packages that depend on the target (e.g.
+#    cachyos-fish-config, fisher, fish-pure-prompt, fish-autopair when
+#    removing fish). Shared deps like bat/eza/fzf are left behind as orphans
+#    (usable from bash too) — add them here if you want those gone as well.
+#    Works for repo AND AUR packages alike (removal is local — no repo
+#    lookup).
+#    Runs AFTER install, so the install list always wins on a conflict.
+# ---------------------------------------------------------------------------
+removed=()
+for p in {{ range .packages.cachyos.remove }}{{ . }} {{ end }}; do
+    if ! pacman -Qq | grep -qx "$p"; then
+        echo "  -> $p not installed. Skipping."
+        continue
+    fi
+    echo "  -> Removing $p..."
+    sudo pacman -Rc --noconfirm "$p"
+    removed+=("$p")
+done
+if [ ${#removed[@]} -gt 0 ]; then
+    echo "  -> Removed: ${removed[*]}"
+fi
+
+# 6. GNOME dark color scheme (only if gsettings exists on this system)
 if command -v gsettings &>/dev/null; then
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 fi
 
-# 6. Ryzen SMU + ThinkPad Z13 first-time setup.
+# 7. Ryzen SMU + ThinkPad Z13 first-time setup.
 #    State-checked against the real persistent artifact (modules-load.d), so
 #    the one-shot z13ctl settings only apply when the module is first set up.
-#    (z13ctl-bin is installed from AUR in step 3, which runs before this.)
+#    (z13ctl-bin is installed from AUR in step 4, which runs before this.)
 if ! grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf 2>/dev/null; then
     echo "  -> First-time Ryzen SMU / Z13 setup..."
     sudo modprobe ryzen_smu
@@ -123,11 +149,11 @@ fi
 systemctl --user daemon-reload
 systemctl --user enable --now llama-api.socket
 
-# 7. ly config tweaks (idempotent seds)
+# 8. ly config tweaks (idempotent seds)
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
 sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
 
-# 8. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface name)
+# 9. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface name)
 wlan_dev="$(nmcli -t -f DEVICE device wifi 2>/dev/null | head -n1 || true)"
 if [ -n "$wlan_dev" ]; then
     nmcli device modify "$wlan_dev" ipv4.ignore-auto-dns yes
@@ -135,12 +161,12 @@ else
     echo "  -> No Wi-Fi device found, skipping auto-DNS setting."
 fi
 
-# 9. EasyEffects presets (installed from the upstream repo)
+# 10. EasyEffects presets (installed from the upstream repo)
 if [ ! -d ~/.config/easyeffects ]; then
     echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 fi
 
-# 10. Append configuration only if it doesn't already exist
+# 11. Append configuration only if it doesn't already exist
 if [ -f /etc/libvirt/network.conf ] && grep -Fq 'firewall_backend = "iptables"' /etc/libvirt/network.conf; then
     echo "  -> Firewall backend already set to iptables. Skipping."
 else
@@ -148,7 +174,7 @@ else
     echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
 fi
 
-# 11. Safely handle the directory creation and chattr attributes
+# 12. Safely handle the directory creation and chattr attributes
 if [ ! -d /var/lib/libvirt/images ]; then
     echo "  -> Creating libvirt images directory..."
     sudo mkdir -p /var/lib/libvirt/images
@@ -164,7 +190,7 @@ else
     sudo chattr +C /var/lib/libvirt/images
 fi
 
-# 12. Enable and start services only if they aren't active/enabled
+# 13. Enable and start services only if they aren't active/enabled
 for service in libvirtd.service libvirtd.socket; do
     if systemctl is-enabled --quiet "$service" && systemctl is-active --quiet "$service"; then
         echo "  -> Service $service is already running and enabled. Skipping."
@@ -174,7 +200,7 @@ for service in libvirtd.service libvirtd.socket; do
     fi
 done
 
-# 13. Safely configure and start the default network (idempotent).
+# 14. Safely configure and start the default network (idempotent).
 #     State source: the stable column layout of plain `virsh net-list`
 #     (Name State Autostart Persistent), verified on this machine:
 #         Name      State    Autostart   Persistent

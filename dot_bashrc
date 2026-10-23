@@ -102,3 +102,6 @@ prompt_details() {
 }
 
 export PS1='\[\e[36m\]\t \[\e[33;1m\]$(prompt_details)\[\e[m\] \$ '
+
+# uv
+export PATH="/home/dan/.local/bin:$PATH"
