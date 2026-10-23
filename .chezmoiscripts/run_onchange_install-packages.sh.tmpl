@@ -127,9 +127,9 @@ else
     echo "  -> No Wi-Fi device found, skipping auto-DNS setting."
 fi
 
-# 8. EasyEffects presets (vendored, pinned installer — no curl|bash at runtime)
+# 8. EasyEffects presets (installed from the upstream repo)
 if [ ! -d ~/.config/easyeffects ]; then
-    echo 1 | bash "{{ .chezmoi.sourceDir }}/.chezmoitemplates/easyeffects-install.sh"
+    echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 fi
 
 # 9. Append configuration only if it doesn't already exist
