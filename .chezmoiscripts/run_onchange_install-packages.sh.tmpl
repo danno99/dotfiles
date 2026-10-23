@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Change-detection trigger: embed the SHA256 of packages.yaml in a comment so
+# the rendered script only changes (and chezmoi re-runs it) when the manifest
+# or this template changes — not on every `chezmoi apply` (official chezmoi
+# pattern: "Run a script when the contents of another file changes").
 # packages.yaml hash: {{ include ".chezmoidata/packages.yaml" | sha256sum }}
 set -euo pipefail
 
@@ -23,7 +27,11 @@ if ! grep -qxF '^\[chaotic-aur\]' /etc/pacman.conf; then
     echo "  -> Registering Chaotic-AUR repo..."
     # Import + trust the Chaotic-AUR signing key (keyserver, then vendor copy)
     if ! sudo pacman-key --finger 3056513887B78AEB &>/dev/null; then
+        # keyserver.ubuntu.com (what the Chaotic docs use) is a SKS-pool
+        # successor that has fallen out of sync with the network, so fall
+        # back to keys.openpgp.org, then to the vendor-published key file.
         sudo pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com \
+          || sudo pacman-key --recv-key 3056513887B78AEB --keyserver keys.openpgp.org \
           || { curl -fsSL https://raw.githubusercontent.com/chaotic-aur/chaotic-aur.github.io/master/chaotic.gpg -o /tmp/chaotic.gpg
                sudo pacman-key --import /tmp/chaotic.gpg
                rm -f /tmp/chaotic.gpg; }
@@ -64,8 +72,8 @@ fi
 #    DB-refresh-and-only-some-packages (-Sy) install can cause. The manifest
 #    packages are listed so missing ones install; --needed skips the
 #    already-present ones (no spurious "up to date -- reinstalling"). NOTE:
-#    this is a full system upgrade with --noconfirm on every manifest change
-#    — heavier and unattended by design (see BEST-PRACTICES.md §2.3).
+#    this is a full system upgrade with --noconfirm — heavier and unattended
+#    by design, but the hash trigger above limits it to manifest changes.
 # ---------------------------------------------------------------------------
 sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
 
@@ -107,8 +115,9 @@ fi
 #    the check is the package DB itself (only act if currently installed).
 #    -c cascades to packages that depend on the target (e.g.
 #    cachyos-fish-config, fisher, fish-pure-prompt, fish-autopair when
-#    removing fish). Shared deps like bat/eza/fzf are left behind as orphans
-#    (usable from bash too) — add them here if you want those gone as well.
+#    removing fish); -n also drops any dependency nothing else needs.
+#    Deps that other packages still use (e.g. fzf, which is in the install
+#    list) are kept.
 #    Works for repo AND AUR packages alike (removal is local — no repo
 #    lookup).
 #    Runs AFTER install, so the install list always wins on a conflict.
@@ -120,7 +129,7 @@ for p in {{ range .packages.cachyos.remove }}{{ . }} {{ end }}; do
         continue
     fi
     echo "  -> Removing $p..."
-    sudo pacman -Rc --noconfirm "$p"
+    sudo pacman -Rcn --noconfirm "$p"
     removed+=("$p")
 done
 if [ ${#removed[@]} -gt 0 ]; then
@@ -132,7 +141,7 @@ if command -v gsettings &>/dev/null; then
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 fi
 
-# 7. Ryzen SMU + ThinkPad Z13 first-time setup.
+# 7. Ryzen SMU + ASUS ROG Flow Z13 first-time setup.
 #    State-checked against the real persistent artifact (modules-load.d), so
 #    the one-shot z13ctl settings only apply when the module is first set up.
 #    (z13ctl-bin is installed from AUR in step 4, which runs before this.)
@@ -146,27 +155,35 @@ if ! grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf 2>/dev/null; then
     fi
 fi
 
+# 8. llama-api user service (idempotent)
 systemctl --user daemon-reload
 systemctl --user enable --now llama-api.socket
 
-# 8. ly config tweaks (idempotent seds)
+# 9. ly config tweaks (idempotent seds)
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
 sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
 
-# 9. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface name)
-wlan_dev="$(nmcli -t -f DEVICE device wifi 2>/dev/null | head -n1 || true)"
+# 10. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface
+#     name). `nmcli device` (i.e. `device status`) is the device list; the old
+#     `nmcli device wifi` form lists networks, whose DEVICE field is empty,
+#     so it never matched anything.
+wlan_dev="$(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2 == "wifi" { print $1; exit }' || true)"
 if [ -n "$wlan_dev" ]; then
     nmcli device modify "$wlan_dev" ipv4.ignore-auto-dns yes
 else
     echo "  -> No Wi-Fi device found, skipping auto-DNS setting."
 fi
 
-# 10. EasyEffects presets (installed from the upstream repo)
-if [ ! -d ~/.config/easyeffects ]; then
+# 11. EasyEffects presets (JackHack96's collection; `echo 1` = "install all").
+#     Guard: install once any preset exists — in the EasyEffects 8+ data dir
+#     (~/.local/share/easyeffects) OR the 7.x config dir (~/.config/...);
+#     the installer itself picks the right directory.
+if ! ls "${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects/output/"*.json \
+        "${XDG_CONFIG_HOME:-$HOME/.config}/easyeffects/output/"*.json >/dev/null 2>&1; then
     echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 fi
 
-# 11. Append configuration only if it doesn't already exist
+# 12. Append configuration only if it doesn't already exist
 if [ -f /etc/libvirt/network.conf ] && grep -Fq 'firewall_backend = "iptables"' /etc/libvirt/network.conf; then
     echo "  -> Firewall backend already set to iptables. Skipping."
 else
@@ -174,7 +191,7 @@ else
     echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
 fi
 
-# 12. Safely handle the directory creation and chattr attributes
+# 13. Safely handle the directory creation and chattr attributes
 if [ ! -d /var/lib/libvirt/images ]; then
     echo "  -> Creating libvirt images directory..."
     sudo mkdir -p /var/lib/libvirt/images
@@ -190,7 +207,7 @@ else
     sudo chattr +C /var/lib/libvirt/images
 fi
 
-# 13. Enable and start services only if they aren't active/enabled
+# 14. Enable and start services only if they aren't active/enabled
 for service in libvirtd.service libvirtd.socket; do
     if systemctl is-enabled --quiet "$service" && systemctl is-active --quiet "$service"; then
         echo "  -> Service $service is already running and enabled. Skipping."
@@ -200,7 +217,7 @@ for service in libvirtd.service libvirtd.socket; do
     fi
 done
 
-# 14. Safely configure and start the default network (idempotent).
+# 15. Safely configure and start the default network (idempotent).
 #     State source: the stable column layout of plain `virsh net-list`
 #     (Name State Autostart Persistent), verified on this machine:
 #         Name      State    Autostart   Persistent
@@ -239,6 +256,9 @@ else
     sudo virsh net-autostart default
 fi
 
-sudo usermod -aG libvirt,render,audio,video $USER
+# `users` is required for z13ctl: the z13ctl-bin package's udev rules grant
+# the users group access to the ASUS HID devices and sysfs attributes, so
+# the non-root `z13ctl batterylimit` call in step 7 works after re-login.
+sudo usermod -aG libvirt,render,audio,video,users $USER
 
 echo "Software installation sync complete"
