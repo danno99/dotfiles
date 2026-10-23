@@ -21,6 +21,7 @@ packages:
       - nvim
       - git
       - github-cli
+      - mise
       - podman
       - podman-compose
       - podman-docker

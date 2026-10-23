@@ -41,6 +41,10 @@ shopt -s histappend
 PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
 
 # --- 3. SAFETY NETS & UTILITIES -----------------------------------------------
+# Default editor (kept in sync with run_once_machine-setup.sh)
+export EDITOR=nvim
+export SUDO_EDITOR=nvim
+
 # Prevent overwriting an existing file via standard output redirection ('>')
 set -o noclobber
 
@@ -53,5 +57,22 @@ alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 alias ll='ls -lah --color=auto'
 
-# Clean color prompt string layout: [Time] Username@Host:CurrentDirectory $
-export PS1="\[\e[36m\][\t]\[\e[m\] \[\e[32m\]\u@\h\[\e[m\]:\[\e[33;1m\]\w\[\e[m\] \$ "
+# Editor aliases (kept in sync with run_once_machine-setup.sh)
+alias vi='nvim'
+alias vim='nvim'
+
+# Run pi via mise
+alias pi='mise run pi'
+
+# Function to get the current Git branch name
+parse_git_branch() {
+  git rev-parse --abbrev-ref HEAD 2>/dev/null
+}
+
+# Your custom prompt updated with a dynamic Git branch indicator
+export PS1="\[\e[36m\][\t]\[\e[m\] \[\e[32m\]\u@\h\[\e[m\]:\[\e[33;1m\]\w\[\e[32m\]\$(
+  branch=\$(parse_git_branch)
+  if [ -n \"\$branch\" ]; then
+    echo \" [\$branch]\"
+  fi
+)\[\e[m\] \$ "
