@@ -67,15 +67,35 @@ alias vim='nvim'
 # Run pi via mise
 alias pi='mise run pi'
 
-# Function to get the current Git branch name
-parse_git_branch() {
-  git rev-parse --abbrev-ref HEAD 2>/dev/null
+prompt_details() {
+  local rc=$? path=$PWD branch i
+  local -a parts
+
+  [[ $path == "$HOME" || $path == "$HOME/"* ]] &&
+    path="~${path#"$HOME"}"
+
+  IFS=/ read -r -a parts <<< "$path"
+  for ((i=0; i<${#parts[@]}-1; i++)); do
+    [[ -z ${parts[i]} || ${parts[i]} == '~' ]] && continue
+    if [[ ${parts[i]} == .* ]]; then
+      parts[i]=${parts[i]:0:2}
+    else
+      parts[i]=${parts[i]:0:1}
+    fi
+  done
+
+  local IFS=/
+  path=${parts[*]}
+  printf '%s' "${path:-/}"
+
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  [[ -n $branch ]] && printf ' [%s]' "$branch"
+
+  if (( rc != 0 )); then
+    printf ' \001\033[31m\002[%d]\001\033[0m\002' "$rc"
+  else
+    printf ' [%d]' "$rc"
+  fi
 }
 
-# Your custom prompt updated with a dynamic Git branch indicator
-export PS1="\[\e[36m\][\t]\[\e[m\] \[\e[32m\]\u@\h\[\e[m\]:\[\e[33;1m\]\w\[\e[32m\]\$(
-  branch=\$(parse_git_branch)
-  if [ -n \"\$branch\" ]; then
-    echo \" [\$branch]\"
-  fi
-)\[\e[m\] \$ "
+export PS1='\[\e[36m\]\t \[\e[33;1m\]$(prompt_details)\[\e[m\] \$ '
