@@ -238,9 +238,6 @@ else
     sudo virsh net-autostart default
 fi
 
-# `users` is required for z13ctl: the z13ctl-bin package's udev rules grant
-# the users group access to the ASUS HID devices and sysfs attributes, so
-# the non-root `z13ctl batterylimit` call in step 7 works after re-login.
-sudo usermod -aG libvirt,render,audio,video,users $USER
+sudo usermod -aG libvirt,render,audio,video $USER
 
 echo "Software installation sync complete"
