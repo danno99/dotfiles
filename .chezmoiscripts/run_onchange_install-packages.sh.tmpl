@@ -45,24 +45,6 @@ if ! grep -qxF '[chaotic-aur]' /etc/pacman.conf; then
     printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' | sudo tee -a /etc/pacman.conf
 fi
 
-# Remove duplicate [chaotic-aur] blocks left by older installer versions or
-# manual edits. Keep the first block and preserve other repository sections.
-_chaotic_count=$(grep -c '^\[chaotic-aur\]' /etc/pacman.conf || true)
-if [ "${_chaotic_count:-0}" -gt 1 ]; then
-    echo "  -> Removing duplicate [chaotic-aur] entry from pacman.conf..."
-    _tmp=$(mktemp)
-    awk '
-      /^\[chaotic-aur\]/ { if (seen++) { skip=1; next } }
-      skip && /^\[/ { skip=0 }
-      skip { next }
-      { print }
-    ' /etc/pacman.conf > "$_tmp"
-    # install sets ownership and permissions explicitly; moving the temporary
-    # file would leave pacman.conf owned by the user with mode 600.
-    sudo install -o root -g root -m 0644 "$_tmp" /etc/pacman.conf
-    rm -f "$_tmp"
-fi
-
 # ---------------------------------------------------------------------------
 # 3. Official repo packages — FULL sync+upgrade (pacman -Syu).
 #    A full upgrade keeps the whole pacman system (official + Chaotic-AUR) at
