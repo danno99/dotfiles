@@ -23,7 +23,7 @@ fi
 #    install via plain pacman instead of being built from source.
 #    Official setup flow: https://aur.chaotic.cx/docs
 # ---------------------------------------------------------------------------
-if ! grep -qxF '^\[chaotic-aur\]' /etc/pacman.conf; then
+if ! grep -qxF '[chaotic-aur]' /etc/pacman.conf; then
     echo "  -> Registering Chaotic-AUR repo..."
     # Import + trust the Chaotic-AUR signing key (keyserver, then vendor copy)
     if ! sudo pacman-key --finger 3056513887B78AEB &>/dev/null; then
@@ -45,13 +45,8 @@ if ! grep -qxF '^\[chaotic-aur\]' /etc/pacman.conf; then
     printf '\n[chaotic-aur]\nInclude = /etc/pacman.d/chaotic-mirrorlist\n' | sudo tee -a /etc/pacman.conf
 fi
 
-# Dedup: remove duplicate [chaotic-aur] blocks (keep first, drop rest).
-# chaotic-mirrorlist has NO install hook (verified 2026-10-04: PKGBUILD only
-# ships /etc/pacman.d/chaotic-mirrorlist), so the `tee -a` append above is the
-# ONLY in-script registration, and the `grep -qxF` guard stops it re-appending.
-# Duplicates therefore come from OUT-OF-BAND edits: a manual stanza, a
-# third-party installer, or an older pre-guard script run. Duplicates make
-# pacman print "database already registered" and break paru.
+# Remove duplicate [chaotic-aur] blocks left by older installer versions or
+# manual edits. Keep the first block and preserve other repository sections.
 _chaotic_count=$(grep -c '^\[chaotic-aur\]' /etc/pacman.conf || true)
 if [ "${_chaotic_count:-0}" -gt 1 ]; then
     echo "  -> Removing duplicate [chaotic-aur] entry from pacman.conf..."
@@ -62,7 +57,10 @@ if [ "${_chaotic_count:-0}" -gt 1 ]; then
       skip { next }
       { print }
     ' /etc/pacman.conf > "$_tmp"
-    sudo mv "$_tmp" /etc/pacman.conf
+    # install sets ownership and permissions explicitly; moving the temporary
+    # file would leave pacman.conf owned by the user with mode 600.
+    sudo install -o root -g root -m 0644 "$_tmp" /etc/pacman.conf
+    rm -f "$_tmp"
 fi
 
 # ---------------------------------------------------------------------------
@@ -177,9 +175,11 @@ fi
 # 11. EasyEffects presets (JackHack96's collection; `echo 1` = "install all").
 #     Guard: install once any preset exists — in the EasyEffects 8+ data dir
 #     (~/.local/share/easyeffects) OR the 7.x config dir (~/.config/...);
-#     the installer itself picks the right directory.
-if ! ls "${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects/output/"*.json \
-        "${XDG_CONFIG_HOME:-$HOME/.config}/easyeffects/output/"*.json >/dev/null 2>&1; then
+#     the installer itself picks the right directory. The dirs are checked
+#     separately: a single `ls dirA/*.json dirB/*.json` exits non-zero when
+#     EITHER dir is missing, so it would re-run the installer on every apply.
+if ! compgen -G "${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects/output/*.json" >/dev/null &&
+   ! compgen -G "${XDG_CONFIG_HOME:-$HOME/.config}/easyeffects/output/*.json" >/dev/null; then
     echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
 fi
 
