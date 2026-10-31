@@ -1,0 +1,9 @@
+[Unit]
+Description=Local socket for Kev-4B decisions
+
+[Socket]
+ListenStream=127.0.0.1:8082
+KeepAlive=true
+
+[Install]
+WantedBy=default.target

@@ -95,8 +95,8 @@
       "innerPadding": -8,
       "barInsetPadding": 0,
       "bottomGap": 0,
-      "transparency": 0.6,
-      "widgetTransparency": 0,
+      "transparency": 0.5,
+      "widgetTransparency": 0.21,
       "squareCorners": true,
       "noBackground": false,
       "maximizeWidgetIcons": true,
@@ -136,7 +136,9 @@
       "hoverPopouts": false,
       "hoverPopoutDelay": 150,
       "followInterfaceStyle": false,
-      "widgetFollowInterfaceStyle": false
+      "widgetFollowInterfaceStyle": false,
+      "attachToScreenEdge": false,
+      "widgetStyle": "segments"
     }
   ],
   "builtInPluginSettings": {
@@ -225,5 +227,6 @@
   ],
   "dmsWindowsFloatingSeeded": [
     "niri"
-  ]
+  ],
+  "widgetColorMode": "default"
 }

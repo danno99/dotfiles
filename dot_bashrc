@@ -105,3 +105,7 @@ export PS1='\[\e[36m\]\t \[\e[33;1m\]$(prompt_details)\[\e[m\] \$ '
 
 # uv
 export PATH="/home/dan/.local/bin:$PATH"
+
+# Zoxide
+eval "$(zoxide init bash --cmd cd)"
+eval "$(fzf --bash)"

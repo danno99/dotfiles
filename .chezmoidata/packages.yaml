@@ -55,5 +55,6 @@ packages:
       - visual-studio-code-bin
       - ryzen_smu-dkms-git
       - uv
+      - zoxide
     aur:
       - z13ctl-bin
