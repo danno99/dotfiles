@@ -1,11 +1,28 @@
 [Unit]
 Description=Local Kev-4B decision model
-StopWhenUnneeded=true
+After=network.target
 
 [Service]
 Type=exec
-ExecStart=/usr/bin/llama-server --model %h/.local/share/models/Kev-4B-Q4_K_M.gguf --alias kev-local --host 127.0.0.1 --port 8083 --device none --gpu-layers 0 --ctx-size 8192 --parallel 1 --threads 8 --threads-batch 8 --flash-attn on
-ExecStartPost=/usr/bin/curl --fail --silent --show-error --output /dev/null --retry 90 --retry-connrefused --retry-delay 1 --retry-max-time 90 --connect-timeout 1 --max-time 2 http://127.0.0.1:8083/health
-TimeoutStartSec=100
+
+ExecStart=/usr/bin/llama-server \
+    --model %h/.local/share/models/Kev-4B-Q4_K_M.gguf \
+    --alias kev-local \
+    --host 127.0.0.1 \
+    --port 8081 \
+    --device none \
+    --gpu-layers 0 \
+    --fit off \
+    --ctx-size 8192 \
+    --parallel 1 \
+    --threads 8 \
+    --threads-batch 8 \
+    --flash-attn on \
+    --sleep-idle-seconds 600
+
+TimeoutStopSec=30
 Restart=on-failure
 RestartSec=5
+
+[Install]
+WantedBy=default.target

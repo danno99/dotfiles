@@ -132,12 +132,15 @@ if ! grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf 2>/dev/null; then
     if command -v z13ctl &>/dev/null; then
         z13ctl batterylimit --set 60
         z13ctl apply --color gold --brightness low
+	z13ctl profile --set performance
+	z13ctl autoswitch --ac performance
     fi
 fi
 
 # 8. llama-api user service (idempotent)
 systemctl --user daemon-reload
-systemctl --user enable --now llama-api.socket
+systemctl --user enable --now llama-server.service
+systemctl --user enable --now kev-server.service
 
 # 9. ly config tweaks (idempotent seds)
 sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
@@ -239,5 +242,14 @@ else
 fi
 
 sudo usermod -aG libvirt,render,audio,video $USER
+
+# 16. AMDGPU DPM high performance udev rule (locks GPU core/memory clocks)
+if [ ! -f /etc/udev/rules.d/99-amdgpu-performance.rules ]; then
+    echo "  -> Setting up AMDGPU DPM high performance udev rule..."
+    sudo tee /etc/udev/rules.d/99-amdgpu-performance.rules << 'EOF'
+ACTION=="add", SUBSYSTEM=="pci", DRIVER=="amdgpu", ATTR{power_dpm_force_performance_level}="high"
+EOF
+    sudo udevadm control --reload-rules && sudo udevadm trigger -s pci -c add || true
+fi
 
 echo "Software installation sync complete"

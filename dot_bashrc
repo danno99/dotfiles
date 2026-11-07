@@ -103,6 +103,9 @@ prompt_details() {
 
 export PS1='\[\e[36m\]\t \[\e[33;1m\]$(prompt_details)\[\e[m\] \$ '
 
+# pdfCraft
+export PDFCRAFT_MODELS="$HOME/.local/share/pdfcraft/models"
+
 # uv
 export PATH="/home/dan/.local/bin:$PATH"
 

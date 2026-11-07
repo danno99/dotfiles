@@ -1,12 +1,16 @@
 {
-  "lastChangelogVersion": "1.4.0",
+  "lastChangelogVersion": "1.5.0",
   "theme": "system",
-  "defaultProvider": "local-llama",
+  "defaultProvider": "llama-local",
   "defaultModel": "qwen-local",
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "packages": [
     "npm:pi-web-access",
     "npm:pi-token-speed",
     "npm:pi-puppeteer"
-  ]
+  ],
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:pi-web-access\",\"scope\":\"user\"}": "0.47.0",
+    "{\"source\":\"npm:pi-puppeteer\",\"scope\":\"user\"}": "0.3.0"
+  }
 }

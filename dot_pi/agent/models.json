@@ -1,21 +1,31 @@
 {
+  "$schema": "https://pi.dev/schemas/models.schema.json",
   "providers": {
-    "local-llama": {
+    "llama-local": {
       "baseUrl": "http://127.0.0.1:8080/v1",
       "api": "openai-completions",
-      "apiKey": "local",
-      "compat": {
-        "supportsDeveloperRole": false,
-        "supportsReasoningEffort": false
-      },
+      "apiKey": "none",
       "models": [
         {
           "id": "qwen-local",
-          "name": "Qwen 3.8 27B (CachyOS llama.cpp MTP, 128K)",
+          "name": "Qwen3.8 27B Q5_K_P (MTP)",
+          "contextWindow": 131072,
+          "maxTokens": 16384,
           "reasoning": true,
           "input": ["text"],
-          "contextWindow": 131072,
-          "maxTokens": 16384
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          },
+          "compat": {
+            "thinkingFormat": "openai",
+            "supportsReasoningEffort": true
+          }
         }
       ]
     }
