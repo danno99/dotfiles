@@ -266,7 +266,7 @@ elif [ -n "$(_default_net_state)" ]; then
     sudo virsh net-autostart default || true
 fi
 
-for grp in libvirt render audio video; do
+for grp in libvirt render audio video realtime; do
     if getent group "$grp" &>/dev/null; then
         sudo usermod -aG "$grp" "$CURRENT_USER"
     fi
