@@ -7,14 +7,20 @@
 # packages.yaml hash: {{ include ".chezmoidata/packages.yaml" | sha256sum }}
 set -euo pipefail
 
+CURRENT_USER="${USER:-$(id -un)}"
 echo "Checking for new packages to install on CachyOS..."
 
 # ---------------------------------------------------------------------------
 # 1. Default shell: switch to bash if the login shell isn't already
 # ---------------------------------------------------------------------------
-if [ "$(getent passwd "$USER" | cut -d: -f7)" != "/usr/bin/bash" ]; then
+user_shell="$(getent passwd "$CURRENT_USER" | cut -d: -f7)"
+if [ "$user_shell" != "/usr/bin/bash" ] && [ "$user_shell" != "/bin/bash" ]; then
     echo "  -> Setting default shell to bash..."
-    chsh -s /usr/bin/bash
+    if [ -t 0 ]; then
+        chsh -s /usr/bin/bash "$CURRENT_USER" || true
+    else
+        echo "  -> Non-interactive session, skipping chsh."
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -23,7 +29,7 @@ fi
 #    install via plain pacman instead of being built from source.
 #    Official setup flow: https://aur.chaotic.cx/docs
 # ---------------------------------------------------------------------------
-if ! grep -qxF '[chaotic-aur]' /etc/pacman.conf; then
+if ! grep -qxF '[chaotic-aur]' /etc/pacman.conf 2>/dev/null; then
     echo "  -> Registering Chaotic-AUR repo..."
     # Import + trust the Chaotic-AUR signing key (keyserver, then vendor copy)
     if ! sudo pacman-key --finger 3056513887B78AEB &>/dev/null; then
@@ -55,7 +61,10 @@ fi
 #    this is a full system upgrade with --noconfirm — heavier and unattended
 #    by design, but the hash trigger above limits it to manifest changes.
 # ---------------------------------------------------------------------------
-sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }} {{ end }}
+pacman_pkgs=({{ range .packages.cachyos.pacman }}{{ . | quote }} {{ end }})
+if [ ${#pacman_pkgs[@]} -gt 0 ]; then
+    sudo pacman -Syu --needed --noconfirm "${pacman_pkgs[@]}"
+fi
 
 # ---------------------------------------------------------------------------
 # 4. AUR packages (genuinely AUR-only — not in any pacman repo). Built via
@@ -63,9 +72,10 @@ sudo pacman -Syu --needed --noconfirm {{ range .packages.cachyos.pacman }}{{ . }
 #    resolvable from a configured repo (e.g. newly added to Chaotic-AUR), it
 #    installs precompiled instead of being built from source.
 # ---------------------------------------------------------------------------
+aur_candidates=({{ range .packages.cachyos.aur }}{{ . | quote }} {{ end }})
 chaotic_pkgs=()
 aur_only=()
-for p in {{ range .packages.cachyos.aur }}{{ . }} {{ end }}; do
+for p in "${aur_candidates[@]}"; do
     if pacman -Si "$p" &>/dev/null; then
         chaotic_pkgs+=("$p")
     else
@@ -80,10 +90,8 @@ fi
 
 if [ ${#aur_only[@]} -gt 0 ]; then
     if command -v paru &>/dev/null; then
-        # Full AUR+official upgrade (not just the listed ones) so the AUR side
-        # stays consistent too; the list ensures first-time installs.
-        echo "  -> Full AUR upgrade + ensuring: ${aur_only[*]}"
-        paru -Syu --needed --noconfirm "${aur_only[@]}"
+        echo "  -> Installing AUR-only packages: ${aur_only[*]}"
+        paru -S --needed --noconfirm "${aur_only[@]}"
     else
         echo "  -> WARNING: paru not found, skipping AUR packages: ${aur_only[*]}" >&2
     fi
@@ -102,9 +110,10 @@ fi
 #    lookup).
 #    Runs AFTER install, so the install list always wins on a conflict.
 # ---------------------------------------------------------------------------
+remove_candidates=({{ range .packages.cachyos.remove }}{{ . | quote }} {{ end }})
 removed=()
-for p in {{ range .packages.cachyos.remove }}{{ . }} {{ end }}; do
-    if ! pacman -Qq | grep -qx "$p"; then
+for p in "${remove_candidates[@]}"; do
+    if ! pacman -Q "$p" &>/dev/null; then
         echo "  -> $p not installed. Skipping."
         continue
     fi
@@ -116,134 +125,156 @@ if [ ${#removed[@]} -gt 0 ]; then
     echo "  -> Removed: ${removed[*]}"
 fi
 
-# 6. GNOME dark color scheme (only if gsettings exists on this system)
-if command -v gsettings &>/dev/null; then
-    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+# ---------------------------------------------------------------------------
+# 6. GNOME dark color scheme (only if gsettings exists and session D-Bus is available)
+# ---------------------------------------------------------------------------
+if command -v gsettings &>/dev/null && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' || true
 fi
 
+# ---------------------------------------------------------------------------
 # 7. Ryzen SMU + ASUS ROG Flow Z13 first-time setup.
 #    State-checked against the real persistent artifact (modules-load.d), so
 #    the one-shot z13ctl settings only apply when the module is first set up.
 #    (z13ctl-bin is installed from AUR in step 4, which runs before this.)
+# ---------------------------------------------------------------------------
 if ! grep -qxF "ryzen_smu" /etc/modules-load.d/ryzen_smu.conf 2>/dev/null; then
     echo "  -> First-time Ryzen SMU / Z13 setup..."
-    sudo modprobe ryzen_smu
-    echo "ryzen_smu" | sudo tee -a /etc/modules-load.d/ryzen_smu.conf
+    sudo modprobe ryzen_smu 2>/dev/null || true
+    echo "ryzen_smu" | sudo tee -a /etc/modules-load.d/ryzen_smu.conf >/dev/null
     if command -v z13ctl &>/dev/null; then
-        z13ctl batterylimit --set 60
-        z13ctl apply --color gold --brightness low
-	z13ctl profile --set performance
-	z13ctl autoswitch --ac performance
+        z13ctl batterylimit --set 60 || true
+        z13ctl apply --color gold --brightness low || true
+        z13ctl profile --set performance || true
+        z13ctl autoswitch --ac performance || true
     fi
 fi
 
+# ---------------------------------------------------------------------------
 # 8. llama-api user service (idempotent)
-systemctl --user daemon-reload
-systemctl --user enable --now llama-server.service
-systemctl --user enable --now kev-server.service
-
-# 9. ly config tweaks (idempotent seds)
-sudo sed -i 's/^animation = none$/animation = matrix/' /etc/ly/config.ini
-sudo sed -i 's/^bigclock = none$/bigclock = en/' /etc/ly/config.ini
-
-# 10. Wi-Fi: ignore auto-DNS (first Wi-Fi device — no hardcoded interface
-#     name). `nmcli device` (i.e. `device status`) is the device list; the old
-#     `nmcli device wifi` form lists networks, whose DEVICE field is empty,
-#     so it never matched anything.
-wlan_dev="$(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2 == "wifi" { print $1; exit }' || true)"
-if [ -n "$wlan_dev" ]; then
-    nmcli device modify "$wlan_dev" ipv4.ignore-auto-dns yes
-else
-    echo "  -> No Wi-Fi device found, skipping auto-DNS setting."
+# ---------------------------------------------------------------------------
+if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR/systemd" ]; then
+    systemctl --user daemon-reload || true
+    for svc in llama-server.service kev-server.service; do
+        if systemctl --user list-unit-files "$svc" &>/dev/null; then
+            systemctl --user enable "$svc" || true
+            systemctl --user start "$svc" || true
+        fi
+    done
 fi
 
+# ---------------------------------------------------------------------------
+# 9. ly config tweaks (idempotent seds)
+# ---------------------------------------------------------------------------
+if [ -f /etc/ly/config.ini ]; then
+    sudo sed -i 's/^animation = .*/animation = matrix/' /etc/ly/config.ini
+    sudo sed -i 's/^bigclock = .*/bigclock = en/' /etc/ly/config.ini
+fi
+
+# ---------------------------------------------------------------------------
+# 10. Wi-Fi: ignore auto-DNS (persistent on active Wi-Fi connection)
+# ---------------------------------------------------------------------------
+active_wifi="$(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null | awk -F: '$2 ~ /wireless|wifi/ { print $1; exit }' || true)"
+if [ -n "$active_wifi" ]; then
+    nmcli connection modify "$active_wifi" ipv4.ignore-auto-dns yes || true
+else
+    echo "  -> No active Wi-Fi connection found, skipping auto-DNS setting."
+fi
+
+# ---------------------------------------------------------------------------
 # 11. EasyEffects presets (JackHack96's collection; `echo 1` = "install all").
 #     Guard: install once any preset exists — in the EasyEffects 8+ data dir
 #     (~/.local/share/easyeffects) OR the 7.x config dir (~/.config/...);
-#     the installer itself picks the right directory. The dirs are checked
-#     separately: a single `ls dirA/*.json dirB/*.json` exits non-zero when
-#     EITHER dir is missing, so it would re-run the installer on every apply.
-if ! compgen -G "${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects/output/*.json" >/dev/null &&
-   ! compgen -G "${XDG_CONFIG_HOME:-$HOME/.config}/easyeffects/output/*.json" >/dev/null; then
-    echo 1 | bash -c "$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh)"
+#     the installer itself picks the right directory.
+# ---------------------------------------------------------------------------
+if ! compgen -G "${XDG_DATA_HOME:-$HOME/.local/share}/easyeffects/output/*.json" >/dev/null 2>&1 && \
+   ! compgen -G "${XDG_CONFIG_HOME:-$HOME/.config}/easyeffects/output/*.json" >/dev/null 2>&1; then
+    echo "  -> Installing EasyEffects presets..."
+    preset_script="$(curl -fsSL https://raw.githubusercontent.com/JackHack96/EasyEffects-Presets/master/install.sh || true)"
+    if [ -n "$preset_script" ]; then
+        echo 1 | bash -c "$preset_script" || true
+    fi
 fi
 
+# ---------------------------------------------------------------------------
 # 12. Append configuration only if it doesn't already exist
-if [ -f /etc/libvirt/network.conf ] && grep -Fq 'firewall_backend = "iptables"' /etc/libvirt/network.conf; then
-    echo "  -> Firewall backend already set to iptables. Skipping."
-else
-    echo "  -> Configuring firewall backend..."
-    echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf
+# ---------------------------------------------------------------------------
+if [ -d /etc/libvirt ]; then
+    if [ -f /etc/libvirt/network.conf ] && grep -Eq '^\s*firewall_backend\s*=\s*"iptables"' /etc/libvirt/network.conf; then
+        echo "  -> Firewall backend already set to iptables. Skipping."
+    else
+        echo "  -> Configuring firewall backend..."
+        echo 'firewall_backend = "iptables"' | sudo tee -a /etc/libvirt/network.conf >/dev/null
+    fi
 fi
 
+# ---------------------------------------------------------------------------
 # 13. Safely handle the directory creation and chattr attributes
+# ---------------------------------------------------------------------------
 if [ ! -d /var/lib/libvirt/images ]; then
     echo "  -> Creating libvirt images directory..."
     sudo mkdir -p /var/lib/libvirt/images
 fi
 
-# Check if the NOCOW (+C) attribute is already applied (common on Btrfs systems).
-# Extract the flag field and look for C anywhere in it — lsattr flag slots are
-# position-dependent, so a fixed-offset pattern is brittle.
-if lsattr -d /var/lib/libvirt/images 2>/dev/null | awk '{print $1}' | grep -q C; then
-    echo "  -> NOCOW (+C) attribute already set on images directory. Skipping."
-else
-    echo "  -> Setting NOCOW (+C) attribute..."
-    sudo chattr +C /var/lib/libvirt/images
+# Check if the NOCOW (+C) attribute is already applied (valid on Btrfs systems).
+if [ "$(findmnt -T /var/lib/libvirt/images -no FSTYPE 2>/dev/null)" = "btrfs" ]; then
+    if lsattr -d /var/lib/libvirt/images 2>/dev/null | awk '{print $1}' | grep -q C; then
+        echo "  -> NOCOW (+C) attribute already set on images directory. Skipping."
+    else
+        echo "  -> Setting NOCOW (+C) attribute..."
+        sudo chattr +C /var/lib/libvirt/images 2>/dev/null || true
+    fi
 fi
 
+# ---------------------------------------------------------------------------
 # 14. Enable and start services only if they aren't active/enabled
+# ---------------------------------------------------------------------------
 for service in libvirtd.service libvirtd.socket; do
-    if systemctl is-enabled --quiet "$service" && systemctl is-active --quiet "$service"; then
+    if systemctl is-enabled --quiet "$service" 2>/dev/null && systemctl is-active --quiet "$service" 2>/dev/null; then
         echo "  -> Service $service is already running and enabled. Skipping."
     else
         echo "  -> Starting and enabling $service..."
-        sudo systemctl enable --now "$service"
+        sudo systemctl enable --now "$service" || true
     fi
 done
 
+# ---------------------------------------------------------------------------
 # 15. Safely configure and start the default network (idempotent).
-#     State source: the stable column layout of plain `virsh net-list`
-#     (Name State Autostart Persistent), verified on this machine:
-#         Name      State    Autostart   Persistent
-#         default   active   yes         yes
-#     Do NOT rely on:
-#       - `net-list --state` — this virsh rejects it ("command 'net-list'
-#         doesn't support option --state"), so with stderr suppressed the
-#         output is always empty and the check always fails;
-#       - `net-dumpxml` markers — the network XML carries NO <active/> or
-#         <autostart/> elements (verified: active network's XML lacks both,
-#         autostart lives in the libvirt state dir, not the XML);
-#       - `net-info` — brittle human-readable parse.
-#     Belt-and-braces: after a failed `net-start`, re-query the state; only
-#     fail loudly if the network is still not active.
-_default_net_state() { sudo virsh net-list 2>/dev/null | awk '$1 == "default" { print $2 }'; }
-_default_net_autostart() { sudo virsh net-list 2>/dev/null | awk '$1 == "default" { print $3 }'; }
+# ---------------------------------------------------------------------------
+_default_net_state() { sudo virsh net-list --all 2>/dev/null | awk '$1 == "default" { print $2 }'; }
+_default_net_autostart() { sudo virsh net-list --all 2>/dev/null | awk '$1 == "default" { print $3 }'; }
 
 if [ "$(_default_net_state)" = "active" ]; then
     echo "  -> libvirt default network is already active. Skipping."
-else
+elif [ -n "$(_default_net_state)" ]; then
     echo "  -> Starting default network..."
     if ! sudo virsh net-start default; then
         if [ "$(_default_net_state)" = "active" ]; then
             echo "  -> Network became active during start attempt. Continuing."
         else
-            echo "  -> ERROR: could not activate the default libvirt network." >&2
-            exit 1
+            echo "  -> WARNING: could not activate the default libvirt network." >&2
         fi
     fi
+else
+    echo "  -> Default libvirt network not defined. Skipping net-start."
 fi
 
 if [ "$(_default_net_autostart)" = "yes" ]; then
     echo "  -> libvirt default network autostart already enabled. Skipping."
-else
+elif [ -n "$(_default_net_state)" ]; then
     echo "  -> Setting default network to autostart..."
-    sudo virsh net-autostart default
+    sudo virsh net-autostart default || true
 fi
 
-sudo usermod -aG libvirt,render,audio,video $USER
+for grp in libvirt render audio video; do
+    if getent group "$grp" &>/dev/null; then
+        sudo usermod -aG "$grp" "$CURRENT_USER"
+    fi
+done
 
+# ---------------------------------------------------------------------------
 # 16. AMDGPU DPM high performance udev rule (locks GPU core/memory clocks)
+# ---------------------------------------------------------------------------
 if [ ! -f /etc/udev/rules.d/99-amdgpu-performance.rules ]; then
     echo "  -> Setting up AMDGPU DPM high performance udev rule..."
     sudo tee /etc/udev/rules.d/99-amdgpu-performance.rules << 'EOF'
