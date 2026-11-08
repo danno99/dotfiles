@@ -1,0 +1,8 @@
+[Unit]
+Description=Port 8082 Socket for llama-server (fable-coding-27b)
+
+[Socket]
+ListenStream=127.0.0.1:8082
+
+[Install]
+WantedBy=sockets.target

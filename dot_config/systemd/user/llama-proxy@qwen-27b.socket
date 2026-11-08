@@ -1,0 +1,8 @@
+[Unit]
+Description=Port 8080 Socket for llama-server (qwen-27b)
+
+[Socket]
+ListenStream=127.0.0.1:8080
+
+[Install]
+WantedBy=sockets.target

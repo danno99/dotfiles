@@ -1,0 +1,8 @@
+[Unit]
+Description=Port 9003 Socket for llama-server (adavar-3b)
+
+[Socket]
+ListenStream=127.0.0.1:9003
+
+[Install]
+WantedBy=sockets.target

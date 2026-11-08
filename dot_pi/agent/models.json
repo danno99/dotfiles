@@ -1,14 +1,98 @@
 {
   "$schema": "https://pi.dev/schemas/models.schema.json",
   "providers": {
-    "llama-local": {
+    "llama-qwen": {
       "baseUrl": "http://127.0.0.1:8080/v1",
       "api": "openai-completions",
       "apiKey": "none",
       "models": [
         {
-          "id": "qwen-local",
-          "name": "Qwen3.8 27B Q5_K_P (MTP)",
+          "id": "qwen-27b",
+          "name": "Qwen3.8 27B HauhauCS (MTP)",
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "input": ["text"],
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          },
+          "compat": {
+            "thinkingFormat": "openai",
+            "supportsReasoningEffort": true
+          }
+        }
+      ]
+    },
+    "llama-swift": {
+      "baseUrl": "http://127.0.0.1:8081/v1",
+      "api": "openai-completions",
+      "apiKey": "none",
+      "models": [
+        {
+          "id": "swift-mtp-27b",
+          "name": "Swift 1.5 Qwen3.8 27B (MTP)",
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "input": ["text"],
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          },
+          "compat": {
+            "thinkingFormat": "openai",
+            "supportsReasoningEffort": true
+          }
+        }
+      ]
+    },
+    "llama-fable": {
+      "baseUrl": "http://127.0.0.1:8082/v1",
+      "api": "openai-completions",
+      "apiKey": "none",
+      "models": [
+        {
+          "id": "fable-coding-27b",
+          "name": "Qwen3.8 27B Fable-5 Coding Distilled",
+          "contextWindow": 131072,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "input": ["text"],
+          "thinkingLevelMap": {
+            "off": null,
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          },
+          "compat": {
+            "thinkingFormat": "openai",
+            "supportsReasoningEffort": true
+          }
+        }
+      ]
+    },
+    "llama-simplicio": {
+      "baseUrl": "http://127.0.0.1:8083/v1",
+      "api": "openai-completions",
+      "apiKey": "none",
+      "models": [
+        {
+          "id": "simplicio-27b",
+          "name": "Simplicio 27B (Q4_K_M)",
           "contextWindow": 131072,
           "maxTokens": 16384,
           "reasoning": true,

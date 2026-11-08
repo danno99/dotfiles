@@ -1,0 +1,57 @@
+[Unit]
+Description=llama.cpp Local Server (%i)
+After=network.target
+PartOf=llama-proxy@%i.service
+StopWhenUnneeded=true
+
+# Mutual exclusion for 27B GPU models to prevent OOM on 61GB unified APU memory:
+# Starting any 27B model automatically stops any other running 27B model first.
+# Kev-4B (CPU) is excluded so it can always run concurrently.
+Conflicts=llama-server@qwen-27b.service llama-server@swift-mtp-27b.service llama-server@fable-coding-27b.service llama-server@simplicio-27b.service
+
+[Service]
+Type=exec
+Environment="RADV_PERFTEST=nogttspill"
+Environment="GGML_VK_PREFER_HOST_MEMORY=1"
+LimitMEMLOCK=infinity
+
+# Hardware performance optimizations on AMD Strix Halo:
+# Pin primary Vulkan models to CCX 0 (Cores 0-7, Threads 0-7, 16-23) to eliminate cross-CCX L3 cache bounce
+CPUAffinity=0-7,16-23
+Nice=-10
+
+# Load shared Strix Halo baseline defaults, then model-specific overrides
+EnvironmentFile=-%h/.config/llama-server/default.env
+EnvironmentFile=%h/.config/llama-server/%i.env
+
+# Clean up any stale socket file before starting
+ExecStartPre=/usr/bin/rm -f /run/user/%U/llama-%i.sock
+
+ExecStart=/usr/bin/llama-server \
+    --model ${MODEL_PATH} \
+    --alias ${ALIAS} \
+    --host /run/user/%U/llama-%i.sock --port 0 \
+    --device ${DEVICE} \
+    --n-gpu-layers ${N_GPU_LAYERS} \
+    --fit ${FIT} \
+    --ctx-size ${CTX_SIZE} \
+    --parallel ${PARALLEL} \
+    --threads ${THREADS} \
+    --threads-batch ${THREADS_BATCH} \
+    --flash-attn ${FLASH_ATTN} \
+    --sleep-idle-seconds ${SLEEP_IDLE_SECONDS} \
+    $TUNING_ARGS \
+    $MTP_ARGS \
+    $SAMPLING_ARGS \
+    $EXTRA_ARGS
+
+# Health check: Wait until the model is loaded and responds ok before proxy forwards
+ExecStartPost=/usr/bin/bash -c 'for i in $(seq 1 300); do curl -s --unix-socket /run/user/%U/llama-%i.sock http://localhost/health 2>/dev/null | grep -q "\"ok\"" && exit 0; sleep 0.1; done; exit 1'
+
+# Clean up socket file on shutdown
+ExecStopPost=/usr/bin/rm -f /run/user/%U/llama-%i.sock
+
+TimeoutStopSec=15
+KillSignal=SIGINT
+Restart=on-failure
+RestartSec=5

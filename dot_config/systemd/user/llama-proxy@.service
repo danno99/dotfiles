@@ -1,0 +1,10 @@
+[Unit]
+Description=Socket Proxy for llama.cpp (%i)
+Requires=llama-server@%i.service
+After=llama-server@%i.service
+
+[Service]
+Type=notify
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --exit-idle-time=600s /run/user/%U/llama-%i.sock
+Restart=on-failure
+RestartSec=1

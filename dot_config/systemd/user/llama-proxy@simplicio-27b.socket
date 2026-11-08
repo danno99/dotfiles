@@ -1,0 +1,8 @@
+[Unit]
+Description=Port 8083 Socket for llama-server (simplicio-27b)
+
+[Socket]
+ListenStream=127.0.0.1:8083
+
+[Install]
+WantedBy=sockets.target

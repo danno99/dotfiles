@@ -1,0 +1,8 @@
+[Unit]
+Description=Port 8081 Socket for llama-server (swift-mtp-27b)
+
+[Socket]
+ListenStream=127.0.0.1:8081
+
+[Install]
+WantedBy=sockets.target

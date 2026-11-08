@@ -1,0 +1,8 @@
+[Unit]
+Description=Port 9002 Socket for llama-server (cyber-ornith-9b)
+
+[Socket]
+ListenStream=127.0.0.1:9002
+
+[Install]
+WantedBy=sockets.target

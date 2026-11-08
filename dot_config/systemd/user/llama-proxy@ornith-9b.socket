@@ -1,0 +1,8 @@
+[Unit]
+Description=Port 9001 Socket for llama-server (ornith-9b)
+
+[Socket]
+ListenStream=127.0.0.1:9001
+
+[Install]
+WantedBy=sockets.target
