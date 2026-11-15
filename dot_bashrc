@@ -107,7 +107,7 @@ export PS1='\[\e[36m\]\t \[\e[33;1m\]$(prompt_details)\[\e[m\] \$ '
 export PDFCRAFT_MODELS="$HOME/.local/share/pdfcraft/models"
 
 # uv
-export PATH="/home/dan/.local/bin:$PATH"
+export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"
 
 # Zoxide
 eval "$(zoxide init bash --cmd cd)"
