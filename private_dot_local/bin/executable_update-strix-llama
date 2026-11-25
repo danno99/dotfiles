@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_DIR="$HOME/.local/src/strix-llama.cpp"
+BUILD_DIR="$REPO_DIR/build"
+INSTALL_PREFIX="$HOME/.local/opt/strix-llama"
+
+CLEAN=0
+FORCE=0
+
+usage() {
+    cat <<USAGE
+Usage: update-strix-llama [OPTIONS]
+
+Pulls the latest commits from halo-box/strix-llama.cpp, builds with Ninja + Vulkan,
+and installs into $INSTALL_PREFIX.
+
+Options:
+  --clean    Remove build directory and run a fresh CMake configure/build
+  --force    Rebuild and reinstall even if already on the latest commit
+  -h, --help Show this help message
+USAGE
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --clean) CLEAN=1 ;;
+        --force) FORCE=1 ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown option: $arg" >&2; usage; exit 1 ;;
+    esac
+done
+
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+    echo "Error: git repository not found at $REPO_DIR" >&2
+    exit 1
+fi
+
+cd "$REPO_DIR"
+
+OLD_REV=$(git rev-parse --short HEAD)
+echo "==> Pulling latest changes in $REPO_DIR (current: $OLD_REV)..."
+git pull --ff-only
+NEW_REV=$(git rev-parse --short HEAD)
+
+# Auto-trigger clean configure if build dir is missing or points to an old path (e.g. after moving repo)
+NEED_CONFIGURE=0
+if [[ "$CLEAN" -eq 1 || ! -f "$BUILD_DIR/CMakeCache.txt" ]]; then
+    NEED_CONFIGURE=1
+elif ! grep -Fq "CMAKE_HOME_DIRECTORY:INTERNAL=$REPO_DIR" "$BUILD_DIR/CMakeCache.txt"; then
+    echo "==> Detected moved repo in CMakeCache.txt; forcing clean reconfigure..."
+    CLEAN=1
+    NEED_CONFIGURE=1
+fi
+
+if [[ "$OLD_REV" == "$NEW_REV" && "$FORCE" -eq 0 && "$CLEAN" -eq 0 ]]; then
+    echo "==> Already up to date at $NEW_REV. Use --force or --clean to rebuild anyway."
+    exit 0
+fi
+
+if [[ "$CLEAN" -eq 1 ]]; then
+    echo "==> Cleaning $BUILD_DIR..."
+    rm -rf "$BUILD_DIR"
+fi
+
+if [[ "$NEED_CONFIGURE" -eq 1 ]]; then
+    echo "==> Configuring CMake (Ninja, Release, Vulkan, Native CPU, OpenSSL)..."
+    cmake -B "$BUILD_DIR" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DGGML_VULKAN=ON \
+        -DGGML_NATIVE=ON \
+        -DLLAMA_OPENSSL=ON
+fi
+
+echo "==> Building strix-llama ($NEW_REV)..."
+cmake --build "$BUILD_DIR" -j
+
+# Remember any active llama-server user units so we can stop before install and restart after
+mapfile -t ACTIVE_SERVICES < <(
+    systemctl --user list-units --type=service --state=active --no-legend 'llama-server@*.service' \
+        | awk '{print $1}'
+)
+
+if (( ${#ACTIVE_SERVICES[@]} > 0 )); then
+    echo "==> Stopping active llama-server services: ${ACTIVE_SERVICES[*]}"
+    systemctl --user stop "${ACTIVE_SERVICES[@]}"
+fi
+
+echo "==> Installing to $INSTALL_PREFIX..."
+cmake --install "$BUILD_DIR" --prefix "$INSTALL_PREFIX"
+
+if (( ${#ACTIVE_SERVICES[@]} > 0 )); then
+    echo "==> Restarting llama-server services: ${ACTIVE_SERVICES[*]}"
+    systemctl --user start "${ACTIVE_SERVICES[@]}"
+fi
+
+echo "==> Done! strix-llama updated: $OLD_REV -> $NEW_REV"
